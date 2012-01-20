@@ -1,1 +1,289 @@
-Test!
+<!DOCTYPE html>
+
+<html><head>
+  <script src="lightgl.js"></script>
+  <script src="csg.js"></script>
+  <script src="viewer.js"></script>
+  <style>
+
+body {
+  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 10px;
+}
+
+pre, code, textarea {
+  font: 12px/20px Monaco, monospace;
+  border: 1px solid #CCC;
+  border-radius: 3px;
+  background: #F9F9F9;
+  padding: 0 3px;
+  color: #555;
+}
+pre, textarea {
+  padding: 10px;
+  width: 100%;
+}
+textarea {
+  height: 200px;
+}
+textarea:focus {
+  outline: none;
+}
+
+h1, h2 { font: bold 50px/50px 'Helvetica Neue', Helvetica, Arial; }
+h2 { font-size: 30px; margin: 10px 0 0 0; }
+a { color: inherit; }
+.viewer { width: 200px; height: 200px; background: #EEE url(images.png); }
+#combined .viewer { width: 150px; height: 150px; }
+table { border-collapse: collapse; margin: 0 auto; }
+td { padding: 5px; text-align: center; }
+td code { background: none; border: none; color: inherit; }
+canvas { cursor: move; }
+
+  </style>
+<script>
+
+var gViewer=null;
+var gSolid=new CSG();
+var gSolidSource="";
+
+function onload()
+{
+  gViewer = new Viewer(new CSG(), 600, 600, 5);
+  document.getElementById("viewer").appendChild(gViewer.gl.canvas);
+}
+
+function updateSolid()
+{
+  var code=document.getElementById('code').value;
+  if(code != gSolidSource)
+  {
+    gSolidSource=code;
+    var errdiv=document.getElementById('error');
+    try {
+      gSolid = new Function(code)();
+      if( (typeof(gSolid) != "object") || (!('polygons' in gSolid)))
+      {
+        throw new Error("Your javascript code should return a CSG object. Try for example: return CSG.cube();");
+      }
+      errdiv.innerHTML = '';
+    } catch (e) {
+      errdiv.innerHTML = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+      gSolid=new CSG();
+    }
+    gViewer.mesh = gSolid.toMesh();
+    gViewer.gl.ondraw();
+  }
+}
+
+function updatePreview()
+{
+  updateSolid();
+}
+
+function getStl()
+{
+  updateSolid();
+  var stl=gSolid.toStlString();
+  document.getElementById('stloutput').value=stl;
+}
+
+</script>
+<title>OpenJsCad</title>  
+</head>
+<body onload="onload()">
+  <h1>OpenJsCad</h1>
+  Please note: currently only works reliably in Google Chrome!<br>
+  Create an STL file using constructive solid modeling. Click <b>Update Preview</b> to parse the source code from the textarea.
+  Click Get STL to generate the stl data, ready for 3d printing. See below for documentation.
+  <table>
+    <tr>
+      <td><div id="viewer" class="viewer" style="background-image:none;width:600px;height:600px;"></div></td>
+    </tr>
+  </table>
+  <textarea id="code">var resolution = 24; // increase to get smoother corners (will get slow!)
+
+var cube1 = CSG.roundedCube({center: [0,0,0], radius: [1,1,1], roundradius: 0.2, resolution: resolution});
+var sphere1 = CSG.sphere({center: [0.5, 0.5, 0.5], radius: 1, resolution: resolution });
+var sphere2 = sphere1.translate([1.2, 0.5, 0]);
+var sphere3 = CSG.sphere({center: [2, 0, 0], radius: 3, resolution: resolution });
+
+var result = cube1;
+result = result.union(sphere1);
+result = result.subtract(sphere2);
+result = result.intersect(sphere3);
+return result;
+
+</textarea>      
+
+<p id="error"></p>
+<br>
+<input type="submit" value="Update Preview" onclick="updatePreview(); return false;"><br>
+<input type="submit" value="Get STL" onclick="getStl(); return false;"><br>
+<textarea id="stloutput" readonly style="width: 80%; height: 100px"></textarea>
+<br>
+<h1>About</h1>
+This is intended to become a Javascript based alternative to <a href="http://www.openscad.org/">OpenSCAD</a>,
+for 3D solid modeling.
+CSG model is contructed using Javascript. For example:<br>
+<code>var cube = CSG.cube(); return cube;</code> creates a cube with a radius of 1 and centered at the origin.
+Enter javascript code in the textbox above. The code should end in a return statement, returning a CSG solid. 
+Click on Update Preview to generate the mesh and update the viewer.
+<br><br>
+Click Get STL to generate the STL file. Create a file with .stl extension in a text editor and paste the contents
+of the box into this file; this is ready to be printed on your 3d printer.
+<h2>License</h2>
+Copyright (c) 2012 Joost Nieuwenhuijse.
+Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c) 2011 Evan Wallace, 
+<a href="https://github.com/joostn/csg.js">extensively modified</a>, copyright (c) 2012 Joost Nieuwenhuijse. 
+Uses <a href="https://github.com/evanw/lightgl.js">lightgl.js</a> by Evan Wallace for WebGL rendering. 
+All code released under MIT license.
+<br><br>
+Contributions are welcome! To contribute go to <a href="https://github.com/joostn/csg.js">CSG.js at GitHub</a>,
+<a href="http://help.github.com/fork-a-repo/">create your own fork</a> and 
+<a href="http://help.github.com/send-pull-requests/">send me a pull request</a>.
+<h2>Viewer navigation</h2>
+Click and drag to rotate the model around the origin.<br>
+Shift+Drag moves the model around.<br>
+Alt+drag zooms (by changing the distance between camera and model).
+
+<h2>Primitive solids</h2>
+Currently the following solids are supported. The parameters are passed in an object; most
+parameters are optional. 3D vectors can be passed in an array. If a scalar is passed
+for a parameter which expects a 3D vector, it is used for the x, y and z value.
+In other words: <code>radius: 1</code> will give <code>radius: [1,1,1]</code>.
+<br><br>
+All rounded solids have a 'resolution' parameter which controls tesselation. If resolution
+is set to 8, then 8 polygons per 360 degree of revolution are used. Beware that rendering
+time will increase dramatically when increasing the resolution. For a sphere the number of polygons
+increases quadratically with the resolution used.
+<br><br> 
+<pre>
+// a cube:
+var cube = CSG.cube({
+  center: [0, 0, 0],
+  radius: [1, 1, 1]
+});
+
+// a sphere:
+var sphere = CSG.sphere({
+  center: [0, 0, 0],
+  radius: 2,            // must be scalar
+  resolution: 32
+});
+
+// a cylinder:
+var cylinder = CSG.cylinder({
+  start: [0, -1, 0],
+  end: [0, 1, 0],
+  radius: 1,
+  resolution: 16
+});
+
+// like a cylinder, but with spherical endpoints:
+var roundedCylinder = CSG.roundedCylinder({
+  start: [0, -1, 0],
+  end: [0, 1, 0],
+  radius: 1,
+  resolution: 16
+});
+
+// a rounded cube:
+var cube = CSG.roundedCube({
+  center: [0, 0, 0],
+  radius: 1,
+  roundradius: 0.2,
+  resolution: 8,
+});
+</pre>
+ 
+<h2>CSG operations</h2>
+The 3 standard CSG operations are supported. All CSG operations return a new solid; the source solids
+are not modified:
+<br><br> 
+<pre>
+var csg1 = cube.union(sphere);
+var csg2 = cube.intersect(sphere);
+var csg3 = cube.subtract(sphere);
+</pre>
+
+<h2>Transformations</h2>
+Solids can be translated, scaled and rotated. Multiple transforms can be combined into a single matrix transform:
+<br><br> 
+<pre>
+var cube = CSG.cube();
+
+// translation:
+var cube2 = cube.translate([1, 2, 3]);
+
+// scaling:
+var largecube = cube.scale(2.0);
+var stretchedcube = cube.scale([1.5, 1, 0.5]);
+
+// rotation:
+var rotated1 = cube.rotateX(-45); // rotate around the X axis
+var rotated2 = cube.rotateY(90);  // rotate around the Y axis
+var rotated3 = cube.rotateZ(20);  // rotate around the Z axis
+
+// combine multiple transforms into a single matrix transform:
+var m = new CSG.Matrix4x4();
+m = m.multiply(CSG.Matrix4x4.rotationX(40));
+m = m.multiply(CSG.Matrix4x4.rotationZ(40));
+m = m.multiply(CSG.Matrix4x4.translation([-.5, 0, 0]));
+m = m.multiply(CSG.Matrix4x4.scaling([1.1, 1.2, 1.3]));
+
+// and apply the transform:
+var cube3 = cube.transform(m);
+</pre>
+
+<h2>Expansion and contraction</h2>
+Expansion can be seen
+as the 3D convolution of an object with a sphere. Contraction is the reverse: the area outside the solid
+is expanded, and this is then subtracted from the solid.
+<br><br>
+Expansion and contraction are very powerful ways to get an object with nice smooth corners. For example
+a rounded cube can be created by expanding a normal cube. 
+<br><br>
+Note that these are expensive operations: spheroids are created around every corner and edge in the original
+object, so the number of polygons quickly increases. Expansion and contraction therefore are only practical for simple 
+non-curved objects. 
+<br><br>
+expand() and contract() take two parameters: the first is the radius of expansion or contraction; the second
+parameter is optional and specififies the resolution (number of polygons on spherical surfaces, per 360 degree revolution).
+<pre>
+var cube1 = CSG.cube({radius: 1.0});
+var cube2 = CSG.cube({radius: 1.0}).translate([-0.3, -0.3, -0.3]);
+var csg = cube1.subtract(cube2);
+var rounded = csg.expand(0.2, 8); 
+</pre>
+
+<h2>2d shapes</h2>
+Two dimensional shapes can be defined through the Polygon2D class. Currently this requires the polygon to be convex
+(i.e. all corners less than 180 degrees). Shapes can be transformed (rotation, translation, scaling).
+To actually use the shape it needs to be extruded into a 3D CSG object through the extrude() function. extrude()
+places the 2D solid onto the z=0 plane, and extrudes in the specified direction. Extrusion can be done with an optional
+twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
+The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
+between the bottom and top surface.
+<pre>
+// Create a shape; argument is an array of 2D coordinates
+// The shape must be convex, can be specified in clockwise or in counterclockwise direction 
+var shape2d=new CSG.Polygon2D([[0,0], [5,0], [3,5], [0,5]]);
+
+// Do some transformations:
+shape2d=shape2d.translate([-2, -2]);
+shape2d=shape2d.rotate(20);
+shape2d=shape2d.scale([0.2, 0.2]);
+
+// And extrude. This creates a CSG solid:
+var extruded=shape2d.extrude({
+  offset: [0.5, 0, 2],   // direction for extrusion
+  twistangle: 180,       // top surface is rotated 180 degrees 
+  twiststeps: 100        // create 100 slices
+});
+</pre>
+
+</body>
+</html>
