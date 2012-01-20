@@ -53,6 +53,7 @@ function onload()
 {
   gViewer = new Viewer(new CSG(), 600, 600, 5);
   document.getElementById("viewer").appendChild(gViewer.gl.canvas);
+  updateSolid();
 }
 
 function updateSolid()
@@ -103,7 +104,7 @@ function getStl()
       <td><div id="viewer" class="viewer" style="background-image:none;width:600px;height:600px;"></div></td>
     </tr>
   </table>
-  <textarea id="code">var resolution = 24; // increase to get smoother corners (will get slow!)
+  <textarea id="code">var resolution = 16; // increase to get smoother corners (will get slow!)
 
 var cube1 = CSG.roundedCube({center: [0,0,0], radius: [1,1,1], roundradius: 0.2, resolution: resolution});
 var sphere1 = CSG.sphere({center: [0.5, 0.5, 0.5], radius: 1, resolution: resolution });
