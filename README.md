@@ -2,7 +2,7 @@
 
 Enthousiastic about OpenSCAD but somewhat frustrated by the limitations of its language, here is an alternative using Javascript. It's free, completely open source, still seriously under construction, based on Evan Wallace's CSG.js library and can be used from within the Chrome browser.
 
-Launch your Chrome browser and go to: joostn.github.com/OpenJsCad/
+Launch your Chrome browser and go to: http://joostn.github.com/OpenJsCad/
 
 The benefits over openSCAD are mainly in the language itself: you can use dynamic arrays for example, and solids can be stored in variables. 
 
@@ -10,7 +10,7 @@ The benefits over openSCAD are mainly in the language itself: you can use dynami
 
 Contributions are welcome, fork me on GitHub!
 
-The only contents here is the 'GUI' part, in the gh-pages branch at https://github.com/joostn/OpenJsCad/tree/gh-pages  
+The only content here is the 'GUI' part, in the gh-pages branch at https://github.com/joostn/OpenJsCad/tree/gh-pages  
 
 The actual CSG engine is in csg.js. Don't fork the copy of csg.js here, but instead create a fork of this branch:
 https://github.com/joostn/csg.js 
