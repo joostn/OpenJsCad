@@ -49,15 +49,27 @@ var gViewer=null;
 var gSolid=new CSG();
 var gSolidSource="";
 
+function isChrome()
+{
+  return (navigator.userAgent.search("Chrome") >= 0);
+}
+
 function onload()
 {
   gViewer = new Viewer(new CSG(), 600, 600, 5);
   document.getElementById("viewer").appendChild(gViewer.gl.canvas);
-  updateSolid();
+  if(isChrome())
+  {
+    updateSolid();
+  }
 }
 
 function updateSolid()
 {
+  if(!isChrome())
+  {
+    alert("Please note that this currently only works reliably in Google Chrome. You may see a corrupted solid, or nothing at all.");
+  }
   var code=document.getElementById('code').value;
   if(code != gSolidSource)
   {
