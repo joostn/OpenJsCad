@@ -81,7 +81,7 @@ function Viewer(csg, width, height, depth) {
   gl.viewport(0, 0, width, height);
   gl.matrixMode(gl.PROJECTION);
   gl.loadIdentity();
-  gl.perspective(45, width / height, 0.1, 100);
+  gl.perspective(45, width / height, 0.5, 1000);
   gl.matrixMode(gl.MODELVIEW);
 
   // Set up WebGL state
