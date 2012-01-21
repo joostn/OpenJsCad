@@ -203,7 +203,7 @@ CSG.prototype = {
   // Return a new CSG solid with solid and empty space switched. This solid is
   // not modified.
   inverse: function() {
-    var flippedpolygons = this.polygons.map(function(p) { p.flipped(); });
+    var flippedpolygons = this.polygons.map(function(p) { return p.flipped(); });
     return CSG.fromPolygons(flippedpolygons);
   },
   
@@ -211,6 +211,26 @@ CSG.prototype = {
   transform: function(matrix4x4) {
     var newpolygons = this.polygons.map(function(p) { return p.transform(matrix4x4); } );
     return CSG.fromPolygons(newpolygons);  
+  },
+
+  mirrored: function(plane) {
+    var newpolygons = this.polygons.map(function(p) { return p.mirrored(plane); } );
+    return CSG.fromPolygons(newpolygons);  
+  },
+  
+  mirroredX: function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(1,0,0), 0);
+    return this.mirrored(plane);
+  },
+  
+  mirroredY: function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(0,1,0), 0);
+    return this.mirrored(plane);
+  },
+  
+  mirroredZ: function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(0,0,1), 0);
+    return this.mirrored(plane);
   },
   
   translate: function(v) {
@@ -1130,6 +1150,12 @@ CSG.Plane.prototype = {
   toString: function() {
     return "[normal: "+this.normal.toString()+", w: "+this.w+"]";
   },
+  
+  mirrorPoint: function(point3d) {
+    var distance = this.signedDistanceToPoint(point3d);
+    var mirrored = point3d.minus(this.normal.times(distance * 2.0));
+    return mirrored;
+  },
 };
 
 
@@ -1288,6 +1314,15 @@ CSG.Polygon.prototype = {
     newvertices.reverse();
     var newplane = this.plane.flipped();
     return new CSG.Polygon(newvertices, this.shared, newplane);
+  },
+  
+  mirrored: function(plane) {
+    var newvertices = this.vertices.map(function(v) {
+      var newpos = plane.mirrorPoint(v.pos);
+      return new CSG.Vertex(newpos);
+    });
+    newvertices.reverse();
+    return new CSG.Polygon(newvertices, this.shared);
   },
   
   // Affine transformation of polygon. Returns a new CSG.Polygon

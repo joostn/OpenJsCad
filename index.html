@@ -226,7 +226,6 @@ var cube = CSG.roundedCube({
 <h2>CSG operations</h2>
 The 3 standard CSG operations are supported. All CSG operations return a new solid; the source solids
 are not modified:
-<br><br> 
 <pre>
 var csg1 = cube.union(sphere);
 var csg2 = cube.intersect(sphere);
@@ -235,7 +234,6 @@ var csg3 = cube.subtract(sphere);
 
 <h2>Transformations</h2>
 Solids can be translated, scaled and rotated. Multiple transforms can be combined into a single matrix transform:
-<br><br> 
 <pre>
 var cube = CSG.cube();
 
@@ -260,6 +258,22 @@ m = m.multiply(CSG.Matrix4x4.scaling([1.1, 1.2, 1.3]));
 
 // and apply the transform:
 var cube3 = cube.transform(m);
+</pre>
+
+<h2>Mirroring</h2>
+Solids can be mirrored in any plane in 3D space:
+<pre>
+var cube = CSG.cube().translate([1,0,0]);
+
+var cube2 = cube.mirroredX(); // mirrored in the x=0 plane
+var cube3 = cube.mirroredY(); // mirrored in the y=0 plane
+var cube4 = cube.mirroredZ(); // mirrored in the z=0 plane
+
+// create a plane by specifying 3 points:
+var plane = CSG.Plane.fromPoints([5,0,0], [5, 1, 0], [3, 1, 7]);
+
+// and mirror in that plane:
+var cube5 = cube.mirrored(plane);
 </pre>
 
 <h2>Expansion and contraction</h2>
