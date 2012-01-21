@@ -283,7 +283,25 @@ var csg = cube1.subtract(cube2);
 var rounded = csg.expand(0.2, 8); 
 </pre>
 
-<h2>2d shapes</h2>
+<h2>Determining the bounds of an object</h2>
+The getBounds() function can be used to retrieve the bounding box of an object.
+This can be useful if you want to align two objects to each other. getBounds() returns
+an array with two elements specifying the minimum x,y,z coordinate and the maximum x,y,z coordinate:
+
+<pre>
+var cube1 = CSG.cube({radius: 10});
+var cube2 = CSG.cube({radius: 5});
+
+// get the right bound of cube1 and the left bound of cube2:
+var deltax = cube1.getBounds()[1].x - cube2.getBounds()[0].x;
+
+// align cube2 so it touches cube1:
+cube2  = cube2.translate([deltax, 0, 0]);
+
+return cube1.union(cube2);
+</pre>
+
+<h2>2D shapes</h2>
 Two dimensional shapes can be defined through the Polygon2D class. Currently this requires the polygon to be convex
 (i.e. all corners less than 180 degrees). Shapes can be transformed (rotation, translation, scaling).
 To actually use the shape it needs to be extruded into a 3D CSG object through the extrude() function. extrude()

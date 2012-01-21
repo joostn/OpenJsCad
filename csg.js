@@ -320,6 +320,38 @@ CSG.prototype = {
       return result;
     }
   },
+  
+  // returns an array of two CSG.Vector3Ds (minimum coordinates and maximum coordinates)
+  getBounds: function() {
+    if(!this.cachedBoundingBox)
+    {
+      var minpoint = new CSG.Vector3D(0,0,0);
+      var maxpoint = new CSG.Vector3D(0,0,0);
+      var polygons = this.polygons;
+      var numpolygons = polygons.length;
+      for(var i=0; i < numpolygons; i++)
+      {
+        var polygon = polygons[i];
+        var bounds = polygon.boundingBox();
+        if(i == 0)
+        {
+          minpoint = bounds[0].clone();
+          maxpoint = bounds[1].clone();
+        }
+        else
+        {
+          minpoint.x = Math.min(minpoint.x, bounds[0].x);
+          minpoint.y = Math.min(minpoint.y, bounds[0].y);
+          minpoint.z = Math.min(minpoint.z, bounds[0].z);
+          maxpoint.x = Math.max(maxpoint.x, bounds[1].x);
+          maxpoint.y = Math.max(maxpoint.y, bounds[1].y);
+          maxpoint.z = Math.max(maxpoint.z, bounds[1].z);
+        }
+      }
+      this.cachedBoundingBox = [minpoint, maxpoint];
+    }
+    return this.cachedBoundingBox;
+  }  
 };
 
 // Parse an option from the options object
@@ -874,9 +906,16 @@ CSG.Plane = function(normal, w) {
 // point is on the plane.
 CSG.Plane.EPSILON = 1e-5;
 
-CSG.Plane.fromPoints = function(a, b, c) {
+CSG.Plane.fromVector3Ds = function(a, b, c) {
   var n = b.minus(a).cross(c.minus(a)).unit();
   return new CSG.Plane(n, n.dot(a));
+};
+
+CSG.Plane.fromPoints = function(a, b, c) {
+  a = new CSG.Vector3D(a);
+  b = new CSG.Vector3D(b);
+  c = new CSG.Vector3D(c);
+  return CSG.Plane.fromVector3Ds(a, b, c);
 };
 
 CSG.Plane.prototype = {
@@ -1119,7 +1158,7 @@ CSG.Polygon = function(vertices, shared, plane) {
   }
   else
   {
-    this.plane = CSG.Plane.fromPoints(vertices[0].pos, vertices[1].pos, vertices[2].pos);
+    this.plane = CSG.Plane.fromVector3Ds(vertices[0].pos, vertices[1].pos, vertices[2].pos);
   }
 
   if(_CSGDEBUG)
