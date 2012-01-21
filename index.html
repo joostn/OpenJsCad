@@ -3,7 +3,7 @@
 <html><head>
   <script src="lightgl.js"></script>
   <script src="csg.js"></script>
-  <script src="viewer.js"></script>
+  <script src="openjscad.js"></script>
   <style>
 
 body {
@@ -56,51 +56,44 @@ function isChrome()
 
 function onload()
 {
-  gViewer = new Viewer(new CSG(), 600, 600, 50);
-  document.getElementById("viewer").appendChild(gViewer.gl.canvas);
-  if(isChrome())
-  {
-    updateSolid();
-  }
+  var containerelement = document.getElementById("viewer");
+  gViewer = new OpenJsCad.Viewer(containerelement, 600, 600, 50);
+  updateSolid();
 }
 
 function updateSolid()
 {
-  if(!isChrome())
+  if(gViewer.supported())
   {
-    alert("Please note that this currently only works reliably in Google Chrome. You may see a corrupted solid, or nothing at all.");
-  }
-  var code=document.getElementById('code').value;
-  if(code != gSolidSource)
-  {
-    gSolidSource=code;
-    var errdiv=document.getElementById('error');
-    try {
-      gSolid = new Function(code)();
-      if( (typeof(gSolid) != "object") || (!('polygons' in gSolid)))
-      {
-        throw new Error("Your javascript code should return a CSG object. Try for example: return CSG.cube();");
+    var code=document.getElementById('code').value;
+    if(code != gSolidSource)
+    {
+      gSolidSource=code;
+      var errtxt = "";
+      var csg = new CSG();
+      try {
+        csg = OpenJsCad.javaScriptToSolid(code);
+      } catch (e) {
+        errtxt = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
       }
-      errdiv.innerHTML = '';
-    } catch (e) {
-      errdiv.innerHTML = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
-      gSolid=new CSG();
+      gSolid = csg;      
+      var errdiv=document.getElementById('error');
+      errdiv.innerHTML = errtxt;
+      errdiv.style.display = (errtxt == "")? "none":"block";
+      gViewer.setCsg(gSolid);
+      var stlarea = document.getElementById('stloutput');
+      stlarea.style.display = "none";
     }
-    gViewer.mesh = gSolid.toMesh();
-    gViewer.gl.ondraw();
   }
-}
-
-function updatePreview()
-{
-  updateSolid();
 }
 
 function getStl()
 {
   updateSolid();
   var stl=gSolid.toStlString();
-  document.getElementById('stloutput').value=stl;
+  var stlarea = document.getElementById('stloutput');
+  stlarea.value=stl;
+  stlarea.style.display = "inline";
 }
 
 </script>
@@ -133,9 +126,9 @@ return result;
 
 <p id="error"></p>
 <br>
-<input type="submit" value="Update Preview" onclick="updatePreview(); return false;"><br>
+<input type="submit" value="Update Preview" onclick="updateSolid(); return false;">
 <input type="submit" value="Get STL" onclick="getStl(); return false;"><br>
-<textarea id="stloutput" readonly style="width: 80%; height: 100px"></textarea>
+<textarea id="stloutput" readonly style="width: 80%; height: 100px; display: none;"></textarea>
 <br>
 <h1>About</h1>
 This is intended to become a Javascript based alternative to <a href="http://www.openscad.org/">OpenSCAD</a>,
