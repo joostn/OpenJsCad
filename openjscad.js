@@ -4,13 +4,9 @@ OpenJsCad = function() {
 // A viewer is a WebGL canvas that lets the user view a mesh. The user can
 // tumble it around by dragging the mouse.
 OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
-  var gl = GL.create();
-  if(!gl)
+  try
   {
-    containerelement.innerHTML = "WebGL is required for the 3D viewer, but your browser doesn't seem to support this."; 
-  }
-  else
-  {   
+    var gl = GL.create();
     this.gl = gl;
     this.angleX = 0;
     this.angleY = 0;
@@ -85,7 +81,10 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
       _this.onDraw();
     };
     this.clear();
-  }  
+  }
+  catch (e) {
+    containerelement.innerHTML = "<b><br><br>Error: "+e.toString()+"</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
+  }
 };
 
 OpenJsCad.Viewer.prototype = {
