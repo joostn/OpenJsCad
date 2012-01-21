@@ -32,8 +32,8 @@ textarea:focus {
   outline: none;
 }
 
-h1, h2 { font: bold 50px/50px 'Helvetica Neue', Helvetica, Arial; }
-h2 { font-size: 30px; margin: 10px 0 0 0; }
+//h1, h2 { font: bold 50px/50px 'Helvetica Neue', Helvetica, Arial; }
+//h2 { font-size: 30px; margin: 10px 0 0 0; }
 a { color: inherit; }
 .viewer { width: 200px; height: 200px; background: #EEE url(images.png); }
 #combined .viewer { width: 150px; height: 150px; }
@@ -41,6 +41,10 @@ table { border-collapse: collapse; margin: 0 auto; }
 td { padding: 5px; text-align: center; }
 td code { background: none; border: none; color: inherit; }
 canvas { cursor: move; }
+
+#needchrome {
+  display: none;
+}
 
   </style>
 <script>
@@ -56,6 +60,14 @@ function isChrome()
 
 function onload()
 {
+  var needchromediv = document.getElementById("needchrome");
+  if(needchromediv)
+  {
+    if(!isChrome())
+    {
+      needchromediv.style.display="block";
+    }
+  }
   var containerelement = document.getElementById("viewer");
   gViewer = new OpenJsCad.Viewer(containerelement, 600, 600, 50);
   updateSolid();
@@ -101,15 +113,19 @@ function getStl()
 </head>
 <body onload="onload()">
   <h1>OpenJsCad</h1>
-  Please note: currently only works reliably in Google Chrome!<br>
-  Create an STL file using constructive solid modeling. Click <b>Update Preview</b> to parse the source code from the textarea.
-  Click Get STL to generate the stl data, ready for 3d printing. See below for documentation.
+<div id="needchrome">Please note: OpenJsCad currently only runs reliably on Google Chrome!</div>
+  Create an STL file for 3D printing using constructive solid modeling in Javascript. 
   <table>
     <tr>
       <td><div id="viewer" class="viewer" style="background-image:none;width:600px;height:600px;"></div></td>
     </tr>
   </table>
-  <textarea id="code">var resolution = 16; // increase to get smoother corners (will get slow!)
+  <h2>Playground</h2>
+Try it by entering some code below. Anything you enter will be lost as soon as this page is reloaded;    
+to build your own models you should instead store them in a .jscad file on your computer 
+and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>.
+<br><br> 
+<textarea id="code">var resolution = 16; // increase to get smoother corners (will get slow!)
 
 var cube1 = CSG.roundedCube({center: [0,0,0], radius: [10,10,10], roundradius: 2, resolution: resolution});
 var sphere1 = CSG.sphere({center: [5, 5, 5], radius: 10, resolution: resolution });
@@ -135,11 +151,11 @@ This is intended to become a Javascript based alternative to <a href="http://www
 for 3D solid modeling.
 CSG model is contructed using Javascript. For example:<br>
 <code>var cube = CSG.cube(); return cube;</code> creates a cube with a radius of 1 and centered at the origin.
-Enter javascript code in the textbox above. The code should end in a return statement, returning a CSG solid. 
-Click on Update Preview to generate the mesh and update the viewer.
+The code should always end in a return statement, returning a CSG solid. 
 <br><br>
-Click Get STL to generate the STL file. Create a file with .stl extension in a text editor and paste the contents
-of the box into this file; this is ready to be printed on your 3d printer.
+To build your own modes, create a .jscad file with your javascript code and parse the file using the 
+<a href="processfile.html">OpenJsCad parser</a>. When finished you can generate an .stl file, 
+ready to be printed on your 3d printer.
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
 Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c) 2011 Evan Wallace, 
@@ -147,7 +163,9 @@ Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c
 Uses <a href="https://github.com/evanw/lightgl.js">lightgl.js</a> by Evan Wallace for WebGL rendering. 
 All code released under MIT license.
 <br><br>
-Contributions are welcome! To contribute go to <a href="https://github.com/joostn/csg.js">CSG.js at GitHub</a>,
+Contributions are welcome! It's all written in Javascript, so if you know how to use it you
+know how to modify it as well.<br><br>
+To contribute go to <a href="https://github.com/joostn/csg.js">CSG.js at GitHub</a>,
 <a href="http://help.github.com/fork-a-repo/">create your own fork</a> and 
 <a href="http://help.github.com/send-pull-requests/">send me a pull request</a>.
 <h2>Viewer navigation</h2>

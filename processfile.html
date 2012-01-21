@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html><head>
+  <script src="lightgl.js"></script>
+  <script src="csg.js"></script>
+  <script src="openjscad.js"></script>
+  <style>
+
+body {
+  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 10px;
+}
+
+pre, code, textarea {
+  font: 12px/20px Monaco, monospace;
+  border: 1px solid #CCC;
+  border-radius: 3px;
+  background: #F9F9F9;
+  padding: 0 3px;
+  color: #555;
+}
+pre, textarea {
+  padding: 10px;
+  width: 100%;
+}
+textarea {
+  height: 200px;
+}
+textarea:focus {
+  outline: none;
+}
+#filedropzone {
+  border: 2px dashed #bbb;
+  -moz-border-radius: 5px;
+  -webkit-border-radius: 5px;
+  border-radius: 5px;
+  padding: 15px;
+  color: black;
+}
+
+#filedropzone_empty {
+  text-align: center;
+  color: #bbb;
+}
+
+#filedropzone_filled {
+  color: black;
+  display: none;
+}
+
+#filebuttons {
+  float: right;
+}
+
+a { color: inherit; }
+.viewer { width: 200px; height: 200px; background: #EEE url(images.png); }
+#combined .viewer { width: 150px; height: 150px; }
+table { border-collapse: collapse; margin: 0 auto; }
+td { padding: 5px; text-align: center; }
+td code { background: none; border: none; color: inherit; }
+canvas { cursor: move; }
+#errdiv {
+  border: 2px solid red;
+  display: none;
+  margin: 5px;
+}
+
+#needchrome {
+  display: none;
+}
+
+  </style>
+<script>
+
+var gViewer=null;
+var gSolid=new CSG();
+
+var gCurrentFile = null;
+
+function isChrome()
+{
+  return (navigator.userAgent.search("Chrome") >= 0);
+}
+
+function onload()
+{
+  var needchromediv = document.getElementById("needchrome");
+  if(needchromediv)
+  {
+    if(!isChrome())
+    {
+      needchromediv.style.display="block";
+    }
+  }
+  try
+  {
+    var containerelement = document.getElementById("viewer");
+    gViewer = new OpenJsCad.Viewer(containerelement, 600, 600, 50);
+    setupDragDrop();
+  } catch (e) {
+    alert(e.toString());
+  }
+}
+
+function updateSolid()
+{
+  if(gViewer.supported())
+  {
+    var code=document.getElementById('code').value;
+    if(code != gSolidSource)
+    {
+      gSolidSource=code;
+      var errtxt = "";
+      var csg = new CSG();
+      try {
+        csg = OpenJsCad.javaScriptToSolid(code);
+      } catch (e) {
+        errtxt = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+      }
+      gSolid = csg;      
+      var errdiv=document.getElementById('error');
+      errdiv.innerHTML = errtxt;
+      errdiv.style.display = (errtxt == "")? "none":"block";
+      gViewer.setCsg(gSolid);
+      var stlarea = document.getElementById('stloutput');
+      stlarea.style.display = "none";
+    }
+  }
+}
+
+function getStl()
+{
+  updateSolid();
+  var stl=gSolid.toStlString();
+  var stlarea = document.getElementById('stloutput');
+  stlarea.value=stl;
+  stlarea.style.display = "inline";
+}
+
+function setupDragDrop()
+{
+  // Check for the various File API support.
+  if (window.File && window.FileReader && window.FileList) {
+    // Great success! All the File APIs are supported.
+  } else {
+    alert("Error: Your browser does not fully support the HTML File API");
+  }
+  var dropZone = document.getElementById('filedropzone');
+  dropZone.addEventListener('dragover', function(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'copy';
+  }, false);
+  dropZone.addEventListener('drop', handleFileSelect, false);
+}
+
+function handleFileSelect(evt)
+{
+  try
+  {
+    evt.stopPropagation();
+    evt.preventDefault();
+    
+    if(!evt.dataTransfer) throw new Error("Not a datatransfer (1)");
+    if(!evt.dataTransfer.files) throw new Error("Not a datatransfer (2)");
+    if(evt.dataTransfer.files.length != 1)
+    {
+      throw new Error("Please drop a single .jscad file");
+    }
+    var file = evt.dataTransfer.files[0];
+    if(!file.name.match(/\.jscad$/i))
+    {
+      throw new Error("Please drop a file with .jscad extension");
+    }
+    if(file.size == 0)
+    {
+      throw new Error("You have dropped an empty file");
+    }              
+    gCurrentFile = file;
+    gPreviousModificationTime = "";
+    fileChanged();
+  } catch (e) {
+    alert(e.toString());
+  }
+}
+
+function fileChanged()
+{
+  var dropZone = document.getElementById('filedropzone');
+  if(gCurrentFile)
+  {
+    var txt = "Current file: "+gCurrentFile.name;
+    document.getElementById("currentfile").innerHTML = txt;
+    document.getElementById("filedropzone_filled").style.display = "block";
+    document.getElementById("filedropzone_empty").style.display = "none";
+  }
+  else
+  {
+    document.getElementById("filedropzone_filled").style.display = "none";
+    document.getElementById("filedropzone_empty").style.display = "block";
+  }
+  parseFile();
+}
+
+function parseFile()
+{
+  setErrorText("");
+  gSolid=new CSG();
+  if(gCurrentFile)
+  {
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      var txt = evt.target.result;
+    };
+    reader.onloadend = function(evt) {
+      if (evt.target.readyState == FileReader.DONE)
+      {
+        var jscadscript = evt.target.result;
+        if(jscadscript == "")
+        {
+          alert("Could not read file. This may be due to security restrictions: in Google Chrome the File API only works if this html page is on a web server. Accessing this page from your hard drive does not work.");
+          gViewer.setCsg(gSolid);
+        }
+        else
+        {         
+          parseJscad(jscadscript);
+        }
+      }
+      else
+      {
+        alert("Failed to read file");
+        gViewer.setCsg(gSolid);
+      }
+    };
+    reader.readAsText(gCurrentFile, "UTF-8");
+  }
+}
+
+function parseJscad(script)
+{
+  try
+  {
+    var csg = OpenJsCad.javaScriptToSolid(script);
+    gSolid = csg;      
+    gViewer.setCsg(gSolid);
+    setErrorText("");
+  }
+  catch(e)
+  {
+    gSolid = new CSG();
+    gViewer.setCsg(gSolid);
+    setErrorText(e.toString());
+  }
+  enableItems();
+  var stlarea = document.getElementById('stloutput');
+  stlarea.style.display = "none";
+}
+
+function enableItems()
+{
+  var hassolid = (gSolid.polygons.length > 0);
+  document.getElementById('getstlbutton').style.display = hassolid? "inline":"none";  
+}
+
+function setErrorText(errtxt)
+{
+  var errdiv = document.getElementById("errdiv");
+  errdiv.style.display = (errtxt == "")? "none":"block";
+  errdiv.innerHTML = errtxt;
+}
+
+function getStl()
+{
+  var stl=gSolid.toStlString();
+  var stlarea = document.getElementById('stloutput');
+  stlarea.value=stl;
+  stlarea.style.display = "inline";
+}
+
+</script>
+<title>OpenJsCad parser</title> 
+<body onload="onload()">
+<h1>OpenJsCad parser</h1>
+<div id="needchrome">Please note: OpenJsCad currently only runs reliably on Google Chrome!</div>
+<div id="viewer" class="viewer" style="background-image:none;width:600px;height:600px;"></div>
+<br>
+<div id="errdiv"></div>
+<div id="filedropzone">
+  <div id="filedropzone_empty">Drop your .jscad file here</div>
+  <div id="filedropzone_filled">
+    <span id="currentfile">dfghdfgh</span>
+    <div id="filebuttons">
+      <button id="getstlbutton" style="display:none" onclick="getStl();">Get STL</button>
+      <button onclick="parseFile();">Reload</button>
+    </div>
+  </div>
+</div>
+<textarea id="stloutput" readonly style="width: 80%; height: 100px; display: none;"></textarea><br>
+<br>
+<h2>Instructions:</h2>
+Create a new file in your favorite text editor. To get started enter the following text:
+<br>
+<pre>
+var cube = CSG.roundedCube({radius: 10, roundradius: 2, resolution: 16});
+var sphere = CSG.sphere({radius: 10, resolution: 16}).translate([5, 5, 5]);
+return cube.union(sphere);
+</pre>
+Save this to a file on your desktop with .jscad extension. Then drag &amp; drop the file from your desktop
+to the box above (marked with 'drop your .jscad file here).<br><br>
+The 3d model should now appear. You can continue to make changes to your .jscad file. Just press Reload 
+to parse the changes, you do not need to drag &amp; drop the file again.
+<br><br>  
+When finished press Get STL to generate the STL file. Copy &amp; paste the STL text to a file with
+.stl extension.
+<br><br>  
+For more information about OpenJsCad see the <a href="index.html">introduction</a>.
+</body>
+</html>
