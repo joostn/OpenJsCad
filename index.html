@@ -276,6 +276,26 @@ var plane = CSG.Plane.fromPoints([5,0,0], [5, 1, 0], [3, 1, 7]);
 var cube5 = cube.mirrored(plane);
 </pre>
 
+<h2>Cutting by a plane</h2>
+A solid can be cut by a plane; only the part on the back side is kept:
+
+<pre>
+var cube = CSG.cube({radius: 10});
+
+// create a plane by specifying 3 points:
+var plane1 = CSG.Plane.fromPoints([5,0,0], [7, 1, 0], [3, 1, 7]);
+
+// or by specifying a normal and a point on the plane:
+var plane2 = CSG.Plane.fromNormalAndPoint([3, 1, 2], [5, 0, 0]);
+
+// and cut by the plane:
+var part1 = cube.cutByPlane(plane2);
+
+// or if we need the other half of the cube:
+var part2 = cube.cutByPlane(plane2.flipped());
+</pre>
+
+
 <h2>Expansion and contraction</h2>
 Expansion can be seen
 as the 3D convolution of an object with a sphere. Contraction is the reverse: the area outside the solid

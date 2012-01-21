@@ -371,7 +371,43 @@ CSG.prototype = {
       this.cachedBoundingBox = [minpoint, maxpoint];
     }
     return this.cachedBoundingBox;
-  }  
+  },
+  
+  // Cut the solid by a plane. Returns the solid on the back side of the plane
+  cutByPlane: function(plane) {
+    // Ideally we would like to do an intersection with a polygon of inifinite size
+    // but this is not supported by our implementation. As a workaround, we will create
+    // a cube, with one face on the plane, and a size larger enough so that the entire
+    // solid fits in the cube.
+
+    // find the max distance of any vertex to the center of the plane:
+    var planecenter = plane.normal.times(plane.w);
+    var maxdistance = 0;
+    this.polygons.map(function(polygon){
+      polygon.vertices.map(function(vertex){
+        var distance = vertex.pos.distanceToSquared(planecenter);
+        if(distance > maxdistance) maxdistance = distance;
+      });
+    });
+    maxdistance = Math.sqrt(maxdistance);
+    maxdistance *= 1.01; // make sure it's really larger
+    
+    // Now build a polygon on the plane, at any point farther than maxdistance from the plane center:
+    var vertices = [];
+    var orthobasis = new CSG.OrthoNormalBasis(plane);
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(maxdistance,maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,-maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(maxdistance,-maxdistance))));
+    var polygon = new CSG.Polygon(vertices, null, plane.flipped());
+    
+    // and extrude the polygon into a cube, backwards of the plane:
+    var cube = polygon.extrude(plane.normal.times(-maxdistance));
+    
+    // Now we can do the intersection:
+    return this.intersect(cube);
+  },
+    
 };
 
 // Parse an option from the options object
@@ -936,6 +972,14 @@ CSG.Plane.fromPoints = function(a, b, c) {
   b = new CSG.Vector3D(b);
   c = new CSG.Vector3D(c);
   return CSG.Plane.fromVector3Ds(a, b, c);
+};
+
+CSG.Plane.fromNormalAndPoint = function(normal, point) {
+  normal = new CSG.Vector3D(normal);
+  point = new CSG.Vector3D(point);
+  normal = normal.unit();
+  var w = point.dot(normal);
+  return new CSG.Plane(normal, w);
 };
 
 CSG.Plane.prototype = {
