@@ -17,5 +17,5 @@ https://github.com/joostn/csg.js
 
 # License
 
-Copyright (c) 2012 Joost Nieuwenuijse (joost@newhouse.nl), under the [MIT license](http://www.opensource.org/licenses/mit-license.php).
+Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl), under the [MIT license](http://www.opensource.org/licenses/mit-license.php).
 Copyright (c) 2011 Evan Wallace (http://madebyevan.com/), under the [MIT license](http://www.opensource.org/licenses/mit-license.php).
