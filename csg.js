@@ -937,7 +937,7 @@ CSG.Vector3D.prototype = {
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
   // Returns a new CSG.Vector3D
   multiply4x4: function(matrix4x4) {
-    return matrix4x4.rightMultiply1x3Vector(this);
+    return matrix4x4.leftMultiply1x3Vector(this);
   },
   
   toStlString: function() {
@@ -1990,7 +1990,8 @@ CSG.Matrix4x4.prototype = {
     return new CSG.Matrix4x4(elements);
   },
   
-  // Multiply a CSG.Vector3D (interpreted as 1 row, 3 column) by this matrix 
+  // Right multiply the matrix by a CSG.Vector3D (interpreted as 3 row, 1 column)
+  // (result = M*v)
   // Fourth element is taken as 1
   rightMultiply1x3Vector: function(v) {
     var v0 = v.x;
@@ -2012,7 +2013,31 @@ CSG.Matrix4x4.prototype = {
     return new CSG.Vector3D(x,y,z);       
   },
   
-  // Multiply a CSG.Vector2D (interpreted as 1 row, 2 column) by this matrix 
+  // Multiply a CSG.Vector3D (interpreted as 3 column, 1 row) by this matrix
+  // (result = v*M)
+  // Fourth element is taken as 1
+  leftMultiply1x3Vector: function(v) {
+    var v0 = v.x;
+    var v1 = v.y;
+    var v2 = v.z;
+    var v3 = 1;    
+    var x = v0*this.elements[0] + v1*this.elements[4] + v2*this.elements[8] + v3*this.elements[12];    
+    var y = v0*this.elements[1] + v1*this.elements[5] + v2*this.elements[9] + v3*this.elements[13];    
+    var z = v0*this.elements[2] + v1*this.elements[6] + v2*this.elements[10] + v3*this.elements[14];    
+    var w = v0*this.elements[3] + v1*this.elements[7] + v2*this.elements[11] + v3*this.elements[15];
+    // scale such that fourth element becomes 1:
+    if(w != 1)
+    {
+      var invw=1.0/w;
+      x *= invw;
+      y *= invw;
+      z *= invw;
+    }
+    return new CSG.Vector3D(x,y,z);       
+  },
+  
+  // Right multiply the matrix by a CSG.Vector2D (interpreted as 2 row, 1 column)
+  // (result = M*v)
   // Fourth element is taken as 1
   rightMultiply1x2Vector: function(v) {
     var v0 = v.x;
@@ -2023,6 +2048,29 @@ CSG.Matrix4x4.prototype = {
     var y = v0*this.elements[4] + v1*this.elements[5] + v2*this.elements[6] + v3*this.elements[7];    
     var z = v0*this.elements[8] + v1*this.elements[9] + v2*this.elements[10] + v3*this.elements[11];    
     var w = v0*this.elements[12] + v1*this.elements[13] + v2*this.elements[14] + v3*this.elements[15];
+    // scale such that fourth element becomes 1:
+    if(w != 1)
+    {
+      var invw=1.0/w;
+      x *= invw;
+      y *= invw;
+      z *= invw;
+    }
+    return new CSG.Vector2D(x,y);       
+  },
+
+  // Multiply a CSG.Vector2D (interpreted as 2 column, 1 row) by this matrix
+  // (result = v*M)
+  // Fourth element is taken as 1
+  leftMultiply1x2Vector: function(v) {
+    var v0 = v.x;
+    var v1 = v.y;
+    var v2 = 0;
+    var v3 = 1;    
+    var x = v0*this.elements[0] + v1*this.elements[4] + v2*this.elements[8] + v3*this.elements[12];    
+    var y = v0*this.elements[1] + v1*this.elements[5] + v2*this.elements[9] + v3*this.elements[13];    
+    var z = v0*this.elements[2] + v1*this.elements[6] + v2*this.elements[10] + v3*this.elements[14];    
+    var w = v0*this.elements[3] + v1*this.elements[7] + v2*this.elements[11] + v3*this.elements[15];
     // scale such that fourth element becomes 1:
     if(w != 1)
     {
@@ -2047,8 +2095,8 @@ CSG.Matrix4x4.rotationX = function(degrees) {
   var sin = Math.sin(radians);
   var els = [
     1, 0, 0, 0,
-    0, cos, -sin, 0,
-    0, sin, cos, 0,
+    0, cos, sin, 0,
+    0, -sin, cos, 0,
     0, 0, 0, 1
   ];
   return new CSG.Matrix4x4(els);
@@ -2060,9 +2108,9 @@ CSG.Matrix4x4.rotationY = function(degrees) {
   var cos = Math.cos(radians);
   var sin = Math.sin(radians);
   var els = [
-    cos, 0, sin, 0,
+    cos, 0, -sin, 0,
     0, 1, 0, 0,
-    -sin, 0, cos, 0,
+    sin, 0, cos, 0,
     0, 0, 0, 1
   ];
   return new CSG.Matrix4x4(els);
@@ -2074,8 +2122,8 @@ CSG.Matrix4x4.rotationZ = function(degrees) {
   var cos = Math.cos(radians);
   var sin = Math.sin(radians);
   var els = [
-    cos, -sin, 0, 0,
-    sin, cos, 0, 0,
+    cos, sin, 0, 0,
+    -sin, cos, 0, 0,
     0, 0, 1, 0,
     0, 0, 0, 1
   ];
@@ -2087,10 +2135,10 @@ CSG.Matrix4x4.translation = function(v) {
   // parse as CSG.Vector3D, so we can pass an array or a CSG.Vector3D
   var vec = new CSG.Vector3D(v);
   var els = [
-    1, 0, 0, vec.x,
-    0, 1, 0, vec.y,
-    0, 0, 1, vec.z,
-    0, 0, 0, 1
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    vec.x, vec.y, vec.z, 1
   ];
   return new CSG.Matrix4x4(els);
 };
@@ -2211,7 +2259,7 @@ CSG.Vector2D.prototype = {
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
   // Returns a new CSG.Vector2D
   multiply4x4: function(matrix4x4) {
-    return matrix4x4.rightMultiply1x2Vector(this);
+    return matrix4x4.leftMultiply1x2Vector(this);
   },
   
   angle: function() {
