@@ -3391,7 +3391,6 @@ CSG.Connector.prototype = {
     other = other.normalized();
     // shift to the origin:
     var transformation = CSG.Matrix4x4.translation(this.point.negated());
-var check = us.transform(transformation);
     // construct the plane crossing through the origin and the two axes:
     var axesplane = CSG.Plane.anyPlaneFromVector3Ds(
       new CSG.Vector3D(0,0,0),
