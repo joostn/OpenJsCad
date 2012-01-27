@@ -90,6 +90,7 @@ for solid CAD anyway.
 
 CSG = function() {
   this.polygons = [];
+  this.properties = new CSG.Properties();
 };
 
 // Construct a CSG solid from a list of `CSG.Polygon` instances.
@@ -128,10 +129,11 @@ CSG.prototype = {
     a.clipTo(b, false);
     b.clipTo(a, true);    
     var newpolygons = a.allPolygons().concat(b.allPolygons());
-    var csg = CSG.fromPolygons(newpolygons);
-    if(canonicalize) csg = csg.canonicalized();
-    if(retesselate) csg = csg.reTesselated();              
-    return csg;
+    var result = CSG.fromPolygons(newpolygons);
+    result.properties = this.properties._merge(csg.properties);
+    if(canonicalize) result = result.canonicalized();
+    if(retesselate) result = result.reTesselated();              
+    return result;
   },
 
   // Return a new CSG solid representing space in this solid but not in the
@@ -160,10 +162,11 @@ CSG.prototype = {
     b.clipTo(a, true);    
     a.addPolygons(b.allPolygons());
     a.invert();
-    var csg = CSG.fromPolygons(a.allPolygons());
-    if(canonicalize) csg = csg.canonicalized();
-    if(retesselate) csg = csg.reTesselated();
-    return csg;
+    var result = CSG.fromPolygons(a.allPolygons());
+    result.properties = this.properties._merge(csg.properties);
+    if(canonicalize) result = result.canonicalized();
+    if(retesselate) result = result.reTesselated();              
+    return result;
   },
 
   // Return a new CSG solid representing space both this solid and in the
@@ -194,10 +197,11 @@ CSG.prototype = {
     b.clipTo(a);
     a.addPolygons(b.allPolygons());
     a.invert();
-    var csg = CSG.fromPolygons(a.allPolygons());
-    if(canonicalize) csg = csg.canonicalized();
-    if(retesselate) csg = csg.reTesselated();
-    return csg;
+    var result = CSG.fromPolygons(a.allPolygons());
+    result.properties = this.properties._merge(csg.properties);
+    if(canonicalize) result = result.canonicalized();
+    if(retesselate) result = result.reTesselated();              
+    return result;
   },
 
   // Return a new CSG solid with solid and empty space switched. This solid is
@@ -205,17 +209,21 @@ CSG.prototype = {
   inverse: function() {
     var flippedpolygons = this.polygons.map(function(p) { return p.flipped(); });
     return CSG.fromPolygons(flippedpolygons);
+    // TODO: flip properties
   },
   
   // Affine transformation of CSG object. Returns a new CSG object
   transform: function(matrix4x4) {
     var newpolygons = this.polygons.map(function(p) { return p.transform(matrix4x4); } );
-    return CSG.fromPolygons(newpolygons);  
+    var result=CSG.fromPolygons(newpolygons); 
+    result.properties = this.properties._transform(matrix4x4);
+    return result; 
   },
 
   mirrored: function(plane) {
     var newpolygons = this.polygons.map(function(p) { return p.mirrored(plane); } );
-    return CSG.fromPolygons(newpolygons);  
+    return CSG.fromPolygons(newpolygons);
+    // TODO: also mirror properties  
   },
   
   mirroredX: function() {
@@ -275,6 +283,7 @@ CSG.prototype = {
       result=result.unionSub(expanded, true, false);
     });
     result = result.canonicalized();
+    result.properties = this.properties;  // keep original properties
     return result;
   },
   
@@ -286,6 +295,7 @@ CSG.prototype = {
       var expanded=p.expand(radius, resolution);
       result=result.subtract(expanded);
     });
+    result.properties = this.properties;  // keep original properties
     return result;
   },
 
@@ -299,6 +309,7 @@ CSG.prototype = {
       var factory = new CSG.fuzzyCSGFactory();
       var result = factory.getCSG(this);
       result.isCanonicalized = true;
+      result.properties = this.properties;  // keep original properties
       return result;
     }
   },
@@ -337,6 +348,7 @@ CSG.prototype = {
       }
       var result = CSG.fromPolygons(destpolygons);
       result.isRetesselated = true;
+      result.properties = this.properties;  // keep original properties
       return result;
     }
   },
@@ -405,7 +417,9 @@ CSG.prototype = {
     var cube = polygon.extrude(plane.normal.times(-maxdistance));
     
     // Now we can do the intersection:
-    return this.intersect(cube);
+    var result = this.intersect(cube);
+    result.properties = this.properties;  // keep original properties
+    return result;
   },
     
 };
@@ -464,7 +478,7 @@ CSG.parseOptionAsInt = function(options, optionname, defaultvalue) {
 CSG.cube = function(options) {
   var c = CSG.parseOptionAs3DVector(options, "center", [0,0,0]);
   var r = CSG.parseOptionAs3DVector(options, "radius", [1,1,1]);
-  return CSG.fromPolygons([
+  var result = CSG.fromPolygons([
     [[0, 4, 6, 2], [-1, 0, 0]],
     [[1, 3, 7, 5], [+1, 0, 0]],
     [[0, 1, 5, 4], [0, -1, 0]],
@@ -484,6 +498,17 @@ CSG.cube = function(options) {
     });
     return new CSG.Polygon(vertices, null /* , plane */);
   }));
+  result.properties.cube = new CSG.Properties();
+  result.properties.cube.center = new CSG.Vertex(c);
+  result.properties.cube.facecenters = [
+    new CSG.Vertex(new CSG.Vector3D([r.x, 0, 0]).plus(c)),
+    new CSG.Vertex(new CSG.Vector3D([-r.x, 0, 0]).plus(c)),
+    new CSG.Vertex(new CSG.Vector3D([0, r.y, 0]).plus(c)),
+    new CSG.Vertex(new CSG.Vector3D([0, -r.y, 0]).plus(c)),
+    new CSG.Vertex(new CSG.Vector3D([0, 0, r.z]).plus(c)),
+    new CSG.Vertex(new CSG.Vector3D([0, 0, -r.z]).plus(c)),
+  ];
+  return result;
 };
 
 // Construct a solid sphere
@@ -554,7 +579,11 @@ CSG.sphere = function(options) {
     }
     prevcylinderpoint = cylinderpoint;
   }
-  return CSG.fromPolygons(polygons);  
+  var result = CSG.fromPolygons(polygons);  
+  result.properties.sphere = new CSG.Properties();
+  result.properties.sphere.center = new CSG.Vertex(c);
+  result.properties.sphere.facepoint = new CSG.Vertex(c.plus(xvector));
+  return result;
 };
 
 // Construct a solid cylinder.
@@ -598,7 +627,12 @@ CSG.cylinder = function(options) {
     polygons.push(new CSG.Polygon([point(0, t1, 0), point(0, t0, 0), point(1, t0, 0), point(1, t1, 0)]));
     polygons.push(new CSG.Polygon([end, point(1, t1, 1), point(1, t0, 1)]));
   }
-  return CSG.fromPolygons(polygons);
+  var result = CSG.fromPolygons(polygons);  
+  result.properties.cylinder = new CSG.Properties();
+  result.properties.cylinder.start = new CSG.Vertex(s);
+  result.properties.cylinder.end = new CSG.Vertex(e);
+  result.properties.cylinder.facepoint = new CSG.Vertex(s.plus(axisX.times(r)));
+  return result;
 };
 
 // Like a cylinder, but with rounded ends instead of flat
@@ -693,7 +727,12 @@ CSG.roundedCylinder = function(options) {
     }
     prevcylinderpoint = cylinderpoint;
   }
-  return CSG.fromPolygons(polygons);
+  var result = CSG.fromPolygons(polygons);  
+  result.properties.roundedCylinder = new CSG.Properties();
+  result.properties.roundedCylinder.start = new CSG.Vertex(p1);
+  result.properties.roundedCylinder.end = new CSG.Vertex(p2);
+  result.properties.roundedCylinder.facepoint = new CSG.Vertex(p1.plus(xvector));
+  return result;
 };
 
 // Construct an axis-aligned solid rounded cuboid.
@@ -760,8 +799,18 @@ CSG.roundedCube = function(options) {
       result = result.unionSub(cylinder,true,true);
     }
   }
+  result.properties.roundedCube = new CSG.Properties();
+  result.properties.roundedCube.center = new CSG.Vertex(center);
+  result.properties.roundedCube.facecenters = [
+    new CSG.Vertex(new CSG.Vector3D([cuberadius.x, 0, 0]).plus(center)),
+    new CSG.Vertex(new CSG.Vector3D([-cuberadius.x, 0, 0]).plus(center)),
+    new CSG.Vertex(new CSG.Vector3D([0, cuberadius.y, 0]).plus(center)),
+    new CSG.Vertex(new CSG.Vector3D([0, -cuberadius.y, 0]).plus(center)),
+    new CSG.Vertex(new CSG.Vector3D([0, 0, cuberadius.z]).plus(center)),
+    new CSG.Vertex(new CSG.Vector3D([0, 0, -cuberadius.z]).plus(center)),
+  ];
   return result;
-}
+};
 
 
 
@@ -823,6 +872,10 @@ CSG.Vector3D.prototype = {
 
   negated: function() {
     return new CSG.Vector3D(-this.x, -this.y, -this.z);
+  },
+
+  abs: function() {
+    return new CSG.Vector3D(Math.abs(this.x), Math.abs(this.y), Math.abs(this.z));
   },
 
   plus: function(a) {
@@ -895,6 +948,23 @@ CSG.Vector3D.prototype = {
     return "("+this.x+", "+this.y+", "+this.z+")";
   },
   
+  // find a vector that is somewhat perpendicular to this one
+  randomNonParallelVector: function() {
+    var abs = this.abs();
+    if( (abs.x <= abs.y) && (abs.x <= abs.z) )
+    {
+      return new CSG.Vector3D(1,0,0);
+    }
+    else if( (abs.y <= abs.x) && (abs.y <= abs.z) )
+    {
+      return new CSG.Vector3D(0,1,0);
+    }
+    else
+    {
+      return new CSG.Vector3D(0,0,1);
+    }
+  },
+  
 };
 
 // # class Vertex
@@ -965,6 +1035,30 @@ CSG.Plane.EPSILON = 1e-5;
 CSG.Plane.fromVector3Ds = function(a, b, c) {
   var n = b.minus(a).cross(c.minus(a)).unit();
   return new CSG.Plane(n, n.dot(a));
+};
+
+// like fromVector3Ds, but allow the vectors to be on one point or one line
+// in such a case a random plane through the given points is constructed
+CSG.Plane.anyPlaneFromVector3Ds = function(a, b, c) {
+  var v1 = b.minus(a);
+  var v2 = c.minus(a);
+  if(v1.length() < 1e-5)
+  {
+    v1 = v2.randomNonParallelVector();
+  }
+  if(v2.length() < 1e-5)
+  {
+    v2 = v1.randomNonParallelVector();
+  }
+  var normal = v1.cross(v2);
+  if(normal.length() < 1e-5)
+  {
+    // this would mean that v1 == v2.negated()
+    v2 = v1.randomNonParallelVector();
+    normal = v1.cross(v2);
+  }
+  normal = normal.unit();
+  return new CSG.Plane(normal, normal.dot(a));
 };
 
 CSG.Plane.fromPoints = function(a, b, c) {
@@ -2119,6 +2213,11 @@ CSG.Vector2D.prototype = {
   multiply4x4: function(matrix4x4) {
     return matrix4x4.rightMultiply1x2Vector(this);
   },
+  
+  angle: function() {
+    // y=sin, x=cos
+    return Math.atan2(this.y, this.x);
+  },
 };
 
 // A polygon in 2D space:
@@ -2415,10 +2514,29 @@ CSG.OrthoNormalBasis = function (plane) {
   }
   this.v = rightvector.cross(plane.normal).unit();
   this.u = plane.normal.cross(this.v);
+  this.plane = plane;
   this.planeorigin = plane.normal.times(plane.w);
 };
 
 CSG.OrthoNormalBasis.prototype = {
+  getProjectionMatrix: function() {
+    return new CSG.Matrix4x4([
+      this.u.x, this.v.x, this.plane.normal.x, 0,
+      this.u.y, this.v.y, this.plane.normal.y, 0,
+      this.u.z, this.v.z, this.plane.normal.z, 0,
+      0, 0, -this.plane.w, 1      
+    ]);
+  },
+  
+  getInverseProjectionMatrix: function() {
+    return new CSG.Matrix4x4([
+      this.u.x, this.u.y, this.u.z, 0,
+      this.v.x, this.v.y, this.v.z, 0,
+      this.plane.normal.x, this.plane.normal.y, this.plane.normal.z, this.plane.w,
+      0,0,0,1
+    ]);
+  },
+  
   to2D: function(vec3) {
     return new CSG.Vector2D(vec3.dot(this.u), vec3.dot(this.v));
   },
@@ -3072,4 +3190,189 @@ CSG.staticTag = 1;
 
 CSG.getTag = function () {
   return CSG.staticTag++;
+};
+
+//////////////////////////////////////
+
+// # Class Properties
+// This class is used to store properties of a solid
+// A property can for example be a CSG.Vertex, a CSG.Plane or a CSG.Line3D
+// Whenever an affine transform is applied to the CSG solid, all its properties are
+// transformed as well.
+// The properties can be stored in a complex nested structure (using arrays and objects)
+CSG.Properties = function() {
+};
+
+CSG.Properties.prototype = {
+  _transform: function(matrix4x4) {
+    var result = new CSG.Properties();
+    CSG.Properties.transformObj(this, result, matrix4x4);
+    return result;
+  },
+  _merge: function(otherproperties) {
+    var result = new CSG.Properties();
+    CSG.Properties.cloneObj(this, result);
+    CSG.Properties.addFrom(result, otherproperties);
+    return result;
+  },
+};
+
+CSG.Properties.transformObj = function(source, result, matrix4x4)
+{
+  for(var propertyname in source)
+  {
+    if(propertyname == "_transform") continue;
+    if(propertyname == "_merge") continue;
+    var propertyvalue = source[propertyname];
+    var transformed = propertyvalue;
+    if(typeof(propertyvalue) == "object")
+    {
+      if( ('transform' in propertyvalue) && (typeof(propertyvalue.transform) == "function") )
+      {
+        transformed = propertyvalue.transform(matrix4x4);
+      }
+      else if(propertyvalue instanceof Array)
+      {
+        transformed = [];
+        CSG.Properties.transformObj(propertyvalue, transformed, matrix4x4);          
+      }
+      else if(propertyvalue instanceof CSG.Properties)
+      {
+        transformed = new CSG.Properties();
+        CSG.Properties.transformObj(propertyvalue, transformed, matrix4x4);          
+      }
+    }
+    result[propertyname] = transformed;
+  }
+};
+
+CSG.Properties.cloneObj = function(source, result)
+{
+  for(var propertyname in source)
+  {
+    if(propertyname == "_transform") continue;
+    if(propertyname == "_merge") continue;
+    var propertyvalue = source[propertyname];
+    var cloned = propertyvalue;
+    if(typeof(propertyvalue) == "object")
+    {
+      if(propertyvalue instanceof Array)
+      {
+        cloned = [];
+        for(var i=0; i < propertyvalue.length; i++)
+        {
+          cloned.push(propertyvalue[i]);
+        }
+      }
+      else if(propertyvalue instanceof CSG.Properties)
+      {
+        cloned = new CSG.Properties();
+        CSG.Properties.cloneObj(propertyvalue, cloned);        
+      }
+    }
+    result[propertyname] = cloned;  
+  }
+};
+
+CSG.Properties.addFrom = function(result, otherproperties)
+{
+  for(var propertyname in otherproperties)
+  {
+    if(propertyname == "_transform") continue;
+    if(propertyname == "_merge") continue;
+    if( (propertyname in result) 
+      && (typeof(result[propertyname]) == "object")
+      && (result[propertyname] instanceof CSG.Properties)
+      && (typeof(otherproperties[propertyname]) == "object")
+      && (otherproperties[propertyname] instanceof CSG.Properties) )
+    {
+      CSG.Properties.addFrom(result[propertyname], otherproperties[propertyname]);
+    }
+    else if(!(propertyname in result))
+    {
+      result[propertyname] = otherproperties[propertyname];
+    }
+  }
+};
+
+//////////////////////////////////////
+
+// # class Connector
+// A connector allows to attach two objects at predefined positions
+// For example a servo motor and a servo horn:
+// Both can have a Connector called 'shaft'
+// The horn can be moved and rotated such that the two connectors match
+// and the horn is attached to the servo motor at the proper position. 
+// Connectors are stored in the properties of a CSG solid so they are
+// ge the same transformations applied as the solid
+
+CSG.Connector = function(point, axisvector, normalvector) {
+  this.point = new CSG.Vector3D(point);
+  this.axisvector = new CSG.Vector3D(axisvector);
+  this.normalvector = new CSG.Vector3D(normalvector);
+};
+
+CSG.Connector.test = function() {
+  var con1 = new CSG.Connector([1,2,5], [1,1,0], [1, -0.8, 0]);
+  var con2 = new CSG.Connector([-5,1,-1], [2,3,5], [0,0,1]);
+  var transform = con1.getTransformationTo(con2, false, 0);
+  var check = con1.transform(transform);
+};
+
+CSG.Connector.prototype = {
+  normalized: function() {
+    var axisvector = this.axisvector.unit();
+    // make the normal vector truly normal:
+    var n = this.normalvector.cross(axisvector).unit();
+//    var normalvector = n.cross(axisvector);
+    var normalvector = axisvector.cross(n);
+    return new CSG.Connector(this.point, axisvector, normalvector);
+  },
+  
+  transform: function(matrix4x4) {
+    var point = this.point.multiply4x4(matrix4x4);
+    var axisvector = this.point.plus(this.axisvector).multiply4x4(matrix4x4).minus(point);
+    var normalvector = this.point.plus(this.normalvector).multiply4x4(matrix4x4).minus(point);
+    return new CSG.Connector(point, axisvector, normalvector);
+  },
+  
+  getTransformationTo: function(other, mirror, axisrotation) {
+    mirror = mirror? true:false;
+    axisrotation = axisrotation? Number(axisrotation):0;
+    var us = this.normalized();
+    other = other.normalized();
+    // shift to the origin:
+    var transformation = CSG.Matrix4x4.translation(this.point.negated());
+var check = us.transform(transformation);
+    // construct the plane crossing through the origin and the two axes:
+    var axesplane = CSG.Plane.anyPlaneFromVector3Ds(
+      new CSG.Vector3D(0,0,0),
+      us.axisvector,
+      other.axisvector
+    );
+    var axesbasis = new CSG.OrthoNormalBasis(axesplane);
+    var angle1 = axesbasis.to2D(us.axisvector).angle();    
+    var angle2 = axesbasis.to2D(other.axisvector).angle(); 
+    var rotation = 180.0 * (angle2 - angle1) / Math.PI;
+    if(mirror) rotation += 180.0;
+    transformation = transformation.multiply(axesbasis.getProjectionMatrix());
+    transformation = transformation.multiply(CSG.Matrix4x4.rotationZ(rotation));
+    transformation = transformation.multiply(axesbasis.getInverseProjectionMatrix());
+    var usAxesAligned = us.transform(transformation);
+    // Now we have done the transformation for aligning the axes.
+    // We still need to align the normals:
+    var normalsplane = CSG.Plane.fromNormalAndPoint(other.axisvector, new CSG.Vector3D(0,0,0));
+    var normalsbasis = new CSG.OrthoNormalBasis(normalsplane);
+    angle1 = normalsbasis.to2D(usAxesAligned.normalvector).angle();    
+    angle2 = normalsbasis.to2D(other.normalvector).angle(); 
+    rotation = 180.0 * (angle2 - angle1) / Math.PI;
+    rotation += axisrotation;
+    transformation = transformation.multiply(normalsbasis.getProjectionMatrix());
+    transformation = transformation.multiply(CSG.Matrix4x4.rotationZ(rotation));
+    transformation = transformation.multiply(normalsbasis.getInverseProjectionMatrix());
+    // and translate to the destination point:
+    transformation = transformation.multiply(CSG.Matrix4x4.translation(other.point));
+    var usAligned = us.transform(transformation);
+    return transformation;       
+  },  
 };
