@@ -421,6 +421,11 @@ CSG.prototype = {
     result.properties = this.properties;  // keep original properties
     return result;
   },
+
+  connectTo: function(myConnector, otherConnector, mirror, axisrotation) {
+    var matrix = myConnector.getTransformationTo(otherConnector, mirror, axisrotation);
+    return this.transform(matrix);
+  }, 
     
 };
 
@@ -499,14 +504,15 @@ CSG.cube = function(options) {
     return new CSG.Polygon(vertices, null /* , plane */);
   }));
   result.properties.cube = new CSG.Properties();
-  result.properties.cube.center = new CSG.Vertex(c);
+  result.properties.cube.center = new CSG.Vector3D(c);
+  // add 6 connectors, at the centers of each face:
   result.properties.cube.facecenters = [
-    new CSG.Vertex(new CSG.Vector3D([r.x, 0, 0]).plus(c)),
-    new CSG.Vertex(new CSG.Vector3D([-r.x, 0, 0]).plus(c)),
-    new CSG.Vertex(new CSG.Vector3D([0, r.y, 0]).plus(c)),
-    new CSG.Vertex(new CSG.Vector3D([0, -r.y, 0]).plus(c)),
-    new CSG.Vertex(new CSG.Vector3D([0, 0, r.z]).plus(c)),
-    new CSG.Vertex(new CSG.Vector3D([0, 0, -r.z]).plus(c)),
+    new CSG.Connector(new CSG.Vector3D([r.x, 0, 0]).plus(c), [1, 0, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([-r.x, 0, 0]).plus(c), [-1, 0, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, r.y, 0]).plus(c), [0, 1, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, -r.y, 0]).plus(c), [0, -1, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, 0, r.z]).plus(c), [0, 0, 1], [1, 0, 0]),
+    new CSG.Connector(new CSG.Vector3D([0, 0, -r.z]).plus(c), [0, 0, -1], [1, 0, 0]),
   ];
   return result;
 };
@@ -581,8 +587,8 @@ CSG.sphere = function(options) {
   }
   var result = CSG.fromPolygons(polygons);  
   result.properties.sphere = new CSG.Properties();
-  result.properties.sphere.center = new CSG.Vertex(c);
-  result.properties.sphere.facepoint = new CSG.Vertex(c.plus(xvector));
+  result.properties.sphere.center = new CSG.Vector3D(c);
+  result.properties.sphere.facepoint = c.plus(xvector);
   return result;
 };
 
@@ -629,9 +635,9 @@ CSG.cylinder = function(options) {
   }
   var result = CSG.fromPolygons(polygons);  
   result.properties.cylinder = new CSG.Properties();
-  result.properties.cylinder.start = new CSG.Vertex(s);
-  result.properties.cylinder.end = new CSG.Vertex(e);
-  result.properties.cylinder.facepoint = new CSG.Vertex(s.plus(axisX.times(r)));
+  result.properties.cylinder.start = new CSG.Connector(s, axisZ.negated(), axisX);
+  result.properties.cylinder.end = new CSG.Connector(e, axisZ, axisX);
+  result.properties.cylinder.facepoint = s.plus(axisX.times(r));
   return result;
 };
 
@@ -727,11 +733,13 @@ CSG.roundedCylinder = function(options) {
     }
     prevcylinderpoint = cylinderpoint;
   }
-  var result = CSG.fromPolygons(polygons);  
+  var result = CSG.fromPolygons(polygons);
+  var ray = zvector.unit();
+  var axisX = xvector.unit();  
   result.properties.roundedCylinder = new CSG.Properties();
-  result.properties.roundedCylinder.start = new CSG.Vertex(p1);
-  result.properties.roundedCylinder.end = new CSG.Vertex(p2);
-  result.properties.roundedCylinder.facepoint = new CSG.Vertex(p1.plus(xvector));
+  result.properties.cylinder.start = new CSG.Connector(p1, ray.negated(), axisX);
+  result.properties.cylinder.end = new CSG.Connector(p2, ray, axisX);
+  result.properties.cylinder.facepoint = p1.plus(xvector);
   return result;
 };
 
@@ -802,12 +810,12 @@ CSG.roundedCube = function(options) {
   result.properties.roundedCube = new CSG.Properties();
   result.properties.roundedCube.center = new CSG.Vertex(center);
   result.properties.roundedCube.facecenters = [
-    new CSG.Vertex(new CSG.Vector3D([cuberadius.x, 0, 0]).plus(center)),
-    new CSG.Vertex(new CSG.Vector3D([-cuberadius.x, 0, 0]).plus(center)),
-    new CSG.Vertex(new CSG.Vector3D([0, cuberadius.y, 0]).plus(center)),
-    new CSG.Vertex(new CSG.Vector3D([0, -cuberadius.y, 0]).plus(center)),
-    new CSG.Vertex(new CSG.Vector3D([0, 0, cuberadius.z]).plus(center)),
-    new CSG.Vertex(new CSG.Vector3D([0, 0, -cuberadius.z]).plus(center)),
+    new CSG.Connector(new CSG.Vector3D([cuberadius.x, 0, 0]).plus(center), [1, 0, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([-cuberadius.x, 0, 0]).plus(center), [-1, 0, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, cuberadius.y, 0]).plus(center), [0, 1, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, -cuberadius.y, 0]).plus(center), [0, -1, 0], [0, 0, 1]),
+    new CSG.Connector(new CSG.Vector3D([0, 0, cuberadius.z]).plus(center), [0, 0, 1], [1, 0, 0]),
+    new CSG.Connector(new CSG.Vector3D([0, 0, -cuberadius.z]).plus(center), [0, 0, -1], [1, 0, 0]),
   ];
   return result;
 };
@@ -937,6 +945,10 @@ CSG.Vector3D.prototype = {
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
   // Returns a new CSG.Vector3D
   multiply4x4: function(matrix4x4) {
+    return matrix4x4.leftMultiply1x3Vector(this);
+  },
+  
+  transform: function(matrix4x4) {
     return matrix4x4.leftMultiply1x3Vector(this);
   },
   
