@@ -524,10 +524,10 @@ OpenJsCad.Processor.prototype = {
     if(this.hasstl)
     {
       this.hasstl = false;
-      if(that.stlDirEntry)
+      if(this.stlDirEntry)
       {
-        that.stlDirEntry.removeRecursively();
-        that.stlDirEntry=null;
+        this.stlDirEntry.removeRecursively();
+        this.stlDirEntry=null;
       }
       this.enableItems();
       if(this.onchange) this.onchange();
