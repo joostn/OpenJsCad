@@ -526,7 +526,7 @@ OpenJsCad.Processor.prototype = {
       this.hasstl = false;
       if(this.stlDirEntry)
       {
-        this.stlDirEntry.removeRecursively();
+        this.stlDirEntry.removeRecursively(function(){});
         this.stlDirEntry=null;
       }
       this.enableItems();
