@@ -32,130 +32,67 @@ textarea:focus {
   outline: none;
 }
 
-//h1, h2 { font: bold 50px/50px 'Helvetica Neue', Helvetica, Arial; }
-//h2 { font-size: 30px; margin: 10px 0 0 0; }
-a { color: inherit; }
-.viewer { width: 200px; height: 200px; background: #EEE url(images.png); }
-#combined .viewer { width: 150px; height: 150px; }
-table { border-collapse: collapse; margin: 0 auto; }
-td { padding: 5px; text-align: center; }
-td code { background: none; border: none; color: inherit; }
 canvas { cursor: move; }
-
-#needchrome {
-  display: none;
-}
 
   </style>
 <script>
-
-var gViewer=null;
-var gSolid=new CSG();
-var gSolidSource="";
-
-function isChrome()
-{
-  return (navigator.userAgent.search("Chrome") >= 0);
-}
+var gProcessor=null;
 
 function onload()
 {
-  var needchromediv = document.getElementById("needchrome");
-  if(needchromediv)
-  {
-    if(!isChrome())
-    {
-      needchromediv.style.display="block";
-    }
-  }
-  var containerelement = document.getElementById("viewer");
-  gViewer = new OpenJsCad.Viewer(containerelement, 600, 600, 50);
+  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
   updateSolid();
 }
 
 function updateSolid()
 {
-  if(gViewer.supported())
-  {
-    var code=document.getElementById('code').value;
-    if(code != gSolidSource)
-    {
-      gSolidSource=code;
-      var errtxt = "";
-      var csg = new CSG();
-      try {
-        csg = OpenJsCad.javaScriptToSolid(code);
-      } catch (e) {
-        errtxt = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
-      }
-      gSolid = csg;      
-      var errdiv=document.getElementById('error');
-      errdiv.innerHTML = errtxt;
-      errdiv.style.display = (errtxt == "")? "none":"block";
-      gViewer.setCsg(gSolid);
-      var stlarea = document.getElementById('stloutput');
-      stlarea.style.display = "none";
-    }
-  }
+  gProcessor.setJsCad(document.getElementById('code').value);
 }
-
-function getStl()
-{
-  updateSolid();
-  var stl=gSolid.toStlString();
-  var stlarea = document.getElementById('stloutput');
-  stlarea.value=stl;
-  stlarea.style.display = "inline";
-}
-
 </script>
 <title>OpenJsCad</title>  
 </head>
 <body onload="onload()">
   <h1>OpenJsCad</h1>
-<div id="needchrome">Please note: OpenJsCad currently only runs reliably on Google Chrome!</div>
-  Create an STL file for 3D printing using constructive solid modeling in Javascript. 
-  <table>
-    <tr>
-      <td><div id="viewer" class="viewer" style="background-image:none;width:600px;height:600px;"></div></td>
-    </tr>
-  </table>
+Create an STL file for 3D printing using constructive solid modeling in Javascript. 
+<div id="viewer"></div>
   <h2>Playground</h2>
 Try it by entering some code below. Anything you enter will be lost as soon as this page is reloaded;    
 to build your own models you should instead store them in a .jscad file on your computer 
 and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>.
 <br><br> 
-<textarea id="code">var resolution = 16; // increase to get smoother corners (will get slow!)
-
-var cube1 = CSG.roundedCube({center: [0,0,0], radius: [10,10,10], roundradius: 2, resolution: resolution});
-var sphere1 = CSG.sphere({center: [5, 5, 5], radius: 10, resolution: resolution });
-var sphere2 = sphere1.translate([12, 5, 0]);
-var sphere3 = CSG.sphere({center: [20, 0, 0], radius: 30, resolution: resolution });
-
-var result = cube1;
-result = result.union(sphere1);
-result = result.subtract(sphere2);
-result = result.intersect(sphere3);
-return result;
-
-</textarea>      
-
-<p id="error"></p>
-<br>
-<input type="submit" value="Update Preview" onclick="updateSolid(); return false;">
-<input type="submit" value="Get STL" onclick="getStl(); return false;"><br>
-<textarea id="stloutput" readonly style="width: 80%; height: 100px; display: none;"></textarea>
+<textarea id="code">
+function main()
+{
+  var resolution = 16; // increase to get smoother corners (will get slow!)
+  
+  var cube1 = CSG.roundedCube({center: [0,0,0], radius: [10,10,10], roundradius: 2, resolution: resolution});
+  var sphere1 = CSG.sphere({center: [5, 5, 5], radius: 10, resolution: resolution });
+  var sphere2 = sphere1.translate([12, 5, 0]);
+  var sphere3 = CSG.sphere({center: [20, 0, 0], radius: 30, resolution: resolution });
+  
+  var result = cube1;
+  result = result.union(sphere1);
+  result = result.subtract(sphere2);
+  result = result.intersect(sphere3);
+  return result;
+}
+</textarea><br>
+<input type="submit" value="Update" onclick="updateSolid(); return false;">
 <br>
 <h1>About</h1>
 This is intended to become a Javascript based alternative to <a href="http://www.openscad.org/">OpenSCAD</a>,
 for 3D solid modeling.
 CSG model is contructed using Javascript. For example:<br>
-<code>var cube = CSG.cube(); return cube;</code> creates a cube with a radius of 1 and centered at the origin.
-The code should always end in a return statement, returning a CSG solid. 
+<pre>function main() {
+  var cube = CSG.cube(); 
+  return cube;
+}</pre>
+creates a cube with a radius of 1 and centered at the origin.
+The code should always contain a main() function, returning a CSG solid. 
 <br><br>
-To build your own modes, create a .jscad file with your javascript code and parse the file using the 
-<a href="processfile.html">OpenJsCad parser</a>. When finished you can generate an .stl file, 
-ready to be printed on your 3d printer.
+To build your own models, create a .jscad file with your javascript code and parse the file using the 
+<a href="processfile.html">OpenJsCad parser</a>. When finished, click on Generate STL and save the result
+in an .stl file, ready to be printed on your 3d printer.
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
 Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c) 2011 Evan Wallace, 
@@ -317,9 +254,129 @@ var csg = cube1.subtract(cube2);
 var rounded = csg.expand(0.2, 8); 
 </pre>
 
+<h2>Using Properties</h2>
+The 'property' property of a solid can be used to store metdata for the object,
+for example the coordinate of a specific point of interest of the solid. Whenever
+the object is transformed (i.e. rotated, scaled or translated), the properties 
+are transformed with it. So the property will keep pointing to the same point
+of interest even after several transformations have been applied to the solid.
+<br><br>
+Properties can have any type, but only the properties of classes supporting
+a 'transform' method will actually be transformed. This includes CSG.Vector3D,
+CSG.Plane and CSG.Connector. In particular CSG.Connector properties (see below) 
+can be very useful: these can
+be used to attach a solid to another solid at a predetermined location regardless of the 
+current orientation. 
+<br><br>
+It's even possible to include a CSG solid as a property of another solid. This could
+be used for example
+to define the cutout cylinders to create matching screw holes for an object. Those 'solid properties'
+get the same transformations as the owning solid but they will not be visible in the result 
+of CSG operations such as union().
+<br><br>
+Other kind of properties (for
+example, strings) will still be included in the properties of the transformed
+solid, but the properties will not get any transformation when the owning solid is transformed. <br><br>
+All primitive solids have some predefined properties, such as the center point
+of a sphere (TODO: document).
+<br><br>
+The solid resulting from CSG operations (union(), subtract(), intersect()) will get
+the merged properties of both source solids. If identically named properties exist, only
+one of them will be kept.
+<pre>
+var cube = CSG.cube({radius: 1.0});
+cube.properties.aCorner = new CSG.Vector3D([1, 1, 1]);
+cube = cube.translate([5, 0, 0]);
+cube = cube.scale(2);
+// cube.properties.aCorner will now point to [12, 2, 2],
+// which is still the same corner point 
+
+// Properties can be stored in arrays; all properties in the array
+// will be transformed if the solid is transformed:
+cube.properties.otherCorners = [
+  new CSG.Vector3D([-1, 1, 1]),
+  new CSG.Vector3D([-1, -1, 1])
+];
+
+// and we can create sub-property objects; these must be of the 
+// CSG.Properties class. All sub properties will be transformed with
+// the solid:
+cube.properties.myProperties = new CSG.Properties();
+cube.properties.myProperties.someProperty = new CSG.Vector3D([-1, -1, -1]);
+</pre>
+
+<h2>Connectors</h2>
+The CSG.Connector class is intended to facilitate 
+attaching two solids to each other at a predetermined
+location and orientation. 
+For example suppose we have a CSG solid depicting a servo motor
+and a solid of a servo arm: by defining a Connector property for each of them, we
+can easily attach the servo arm to the servo motor at the correct position
+(i.e. the motor shaft) and orientation (i.e. arm perpendicular to the shaft) 
+even if we don't know their current position and orientation
+in 3D space.<br><br>
+In other words Connector give us the freedom to rotate and translate objects at will without the need
+to keep track of their positions and boundaries. And if a third party library exposes connectors for
+its solids, the user of the library does not have to know the actual dimensions or
+shapes, only the names of the connector properties.
+<br><br>
+A CSG.Connector consist of 3 properties:<br>
+<b>point</b>: a CSG.Vector3D defining the connection point in 3D space<br>
+<b>axis</b>: a CSG.Vector3D defining the direction vector of the connection 
+(in the case of the servo motor example it would point in the direction of the shaft)<br>
+<b>normal</b>: a CSG.Vector3D direction vector somewhat perpendicular to axis; this
+defines the &quot;12 o'clock&quot; orientation of the connection.
+<br><br>
+When connecting two connectors, the solid is transformed such that the <b>point</b>
+properties will be identical, the <b>axis</b> properties will have the same direction
+(or opposite direction if mirror == true), and the <b>normal</b>s match as much as possible.
+<br><br>
+Connectors can be connected by means of two methods:<br>
+A CSG solid's <b>connectTo()</b> function transforms a solid such that two connectors
+become connected.<br>
+Alternatively we can use a connector's <b>getTransformationTo()</b> method to obtain
+a transformation matrix which would connect the connectors. This can be used if we
+need to apply the same transform to multiple solids.
+
+<pre>
+var cube1 = CSG.cube({radius: 10});
+var cube2 = CSG.cube({radius: 4});
+
+// define a connector on the center of one face of cube1
+// The connector's axis points outwards and its normal points
+// towards the positive z axis:
+cube1.properties.myConnector = new CSG.Connector([10, 0, 0], [1, 0, 0], [0, 0, 1]);
+
+// define a similar connector for cube 2:
+cube2.properties.myConnector = new CSG.Connector([0, -4, 0], [0, -1, 0], [0, 0, 1]);
+
+// do some random transformations on cube 1:
+cube1 = cube1.rotateX(30);
+cube1 = cube1.translate([3.1, 2, 0]);
+
+// Now attach cube2 to cube 1:
+cube2 = cube2.connectTo(
+  cube2.properties.myConnector, 
+  cube1.properties.myConnector, 
+  true,   // mirror 
+  0       // normalrotation
+);
+
+// Or alternatively:
+var matrix = cube2.properties.myConnector.getTransformationTo(
+  cube1.properties.myConnector, 
+  true,   // mirror 
+  0       // normalrotation
+);
+cube2 = cube2.transform(matrix);
+
+var result = cube2.union(cube1);
+
+</pre>
+
 <h2>Determining the bounds of an object</h2>
 The getBounds() function can be used to retrieve the bounding box of an object.
-This can be useful if you want to align two objects to each other. getBounds() returns
+getBounds() returns
 an array with two elements specifying the minimum x,y,z coordinate and the maximum x,y,z coordinate:
 
 <pre>

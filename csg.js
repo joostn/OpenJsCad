@@ -100,6 +100,14 @@ CSG.fromPolygons = function(polygons) {
   return csg;
 };
 
+// create from an untyped object with identical property names:
+CSG.fromObject = function(obj) {
+  var polygons = obj.polygons.map( function(p) {
+    return CSG.Polygon.fromObject(p);
+  });
+  return CSG.fromPolygons(polygons);
+};
+
 CSG.prototype = {
   toPolygons: function() {
     return this.polygons;
@@ -221,9 +229,7 @@ CSG.prototype = {
   },
 
   mirrored: function(plane) {
-    var newpolygons = this.polygons.map(function(p) { return p.mirrored(plane); } );
-    return CSG.fromPolygons(newpolygons);
-    // TODO: also mirror properties  
+    return this.transform(CSG.Matrix4x4.mirroring(plane));
   },
   
   mirroredX: function() {
@@ -269,7 +275,7 @@ CSG.prototype = {
   },
   
   toString: function() {
-    var result = "";
+    var result = "CSG solid:\n";
     this.polygons.map(function(p){ result += p.toString(); });
     return result;
   },
@@ -422,8 +428,15 @@ CSG.prototype = {
     return result;
   },
 
-  connectTo: function(myConnector, otherConnector, mirror, axisrotation) {
-    var matrix = myConnector.getTransformationTo(otherConnector, mirror, axisrotation);
+  // Connect a solid to another solid, such that two CSG.Connectors become connected
+  //   myConnector: a CSG.Connector of this solid
+  //   otherConnector: a CSG.Connector to which myConnector should be connected
+  //   mirror: false: the 'axis' vectors of the connectors should point in the same direction
+  //           true: the 'axis' vectors of the connectors should point in opposite direction
+  //   normalrotation: degrees of rotation between the 'normal' vectors of the two
+  //                   connectors
+  connectTo: function(myConnector, otherConnector, mirror, normalrotation) {
+    var matrix = myConnector.getTransformationTo(otherConnector, mirror, normalrotation);
     return this.transform(matrix);
   }, 
     
@@ -587,8 +600,8 @@ CSG.sphere = function(options) {
   }
   var result = CSG.fromPolygons(polygons);  
   result.properties.sphere = new CSG.Properties();
-  result.properties.sphere.center = new CSG.Vector3D(c);
-  result.properties.sphere.facepoint = c.plus(xvector);
+  result.properties.sphere.center = new CSG.Vector3D(center);
+  result.properties.sphere.facepoint = center.plus(xvector);
   return result;
 };
 
@@ -737,9 +750,9 @@ CSG.roundedCylinder = function(options) {
   var ray = zvector.unit();
   var axisX = xvector.unit();  
   result.properties.roundedCylinder = new CSG.Properties();
-  result.properties.cylinder.start = new CSG.Connector(p1, ray.negated(), axisX);
-  result.properties.cylinder.end = new CSG.Connector(p2, ray, axisX);
-  result.properties.cylinder.facepoint = p1.plus(xvector);
+  result.properties.roundedCylinder.start = new CSG.Connector(p1, ray.negated(), axisX);
+  result.properties.roundedCylinder.end = new CSG.Connector(p2, ray, axisX);
+  result.properties.roundedCylinder.facepoint = p1.plus(xvector);
   return result;
 };
 
@@ -991,6 +1004,12 @@ CSG.Vertex = function(pos) {
   this.pos = pos;
 };
 
+// create from an untyped object with identical property names:
+CSG.Vertex.fromObject = function(obj) {
+  var pos = new CSG.Vector3D(obj.pos);
+  return new CSG.Vertex(pos);
+};
+
 CSG.Vertex.prototype = {
   // Return a vertex with all orientation-specific data (e.g. vertex normal) flipped. Called when the
   // orientation of a polygon is flipped.
@@ -1038,6 +1057,13 @@ CSG.Vertex.prototype = {
 CSG.Plane = function(normal, w) {
   this.normal = normal;
   this.w = w;
+};
+
+// create from an untyped object with identical property names:
+CSG.Plane.fromObject = function(obj) {
+  var normal = new CSG.Vector3D(obj.normal);
+  var w = parseFloat(obj.w);
+  return new CSG.Plane(normal, w);
 };
 
 // `CSG.Plane.EPSILON` is the tolerance used by `splitPolygon()` to decide if a
@@ -1343,6 +1369,16 @@ CSG.Polygon = function(vertices, shared, plane) {
   }
 };
 
+// create from an untyped object with identical property names:
+CSG.Polygon.fromObject = function(obj) {
+  var vertices = obj.vertices.map(function(v) {
+    return CSG.Vertex.fromObject(v);
+  });
+  var shared = null;
+  var plane = CSG.Plane.fromObject(obj.plane);
+  return new CSG.Polygon(vertices, shared, plane);
+};
+
 CSG.Polygon.prototype = {
   // check whether the polygon is convex (it should be, otherwise we will get unexpected results)
   checkIfConvex: function() {
@@ -1466,19 +1502,17 @@ CSG.Polygon.prototype = {
     return new CSG.Polygon(newvertices, this.shared, newplane);
   },
   
-  mirrored: function(plane) {
-    var newvertices = this.vertices.map(function(v) {
-      var newpos = plane.mirrorPoint(v.pos);
-      return new CSG.Vertex(newpos);
-    });
-    newvertices.reverse();
-    return new CSG.Polygon(newvertices, this.shared);
-  },
-  
   // Affine transformation of polygon. Returns a new CSG.Polygon
   transform: function(matrix4x4) {
     var newvertices = this.vertices.map(function(v) { return v.transform(matrix4x4); } );
     var newplane = this.plane.transform(matrix4x4);
+    var scalefactor = matrix4x4.elements[0] * matrix4x4.elements[5] * matrix4x4.elements[10];
+    if(scalefactor < 0)
+    {
+      // the transformation includes mirroring. We need to reverse the vertex order
+      // in order to preserve the inside/outside orientation:
+      newvertices.reverse();
+    }
     return new CSG.Polygon(newvertices, this.shared, newplane);
   },
   
@@ -2151,6 +2185,21 @@ CSG.Matrix4x4.translation = function(v) {
     0, 1, 0, 0,
     0, 0, 1, 0,
     vec.x, vec.y, vec.z, 1
+  ];
+  return new CSG.Matrix4x4(els);
+};
+
+// Create an affine matrix for mirroring into an arbitrary plane:
+CSG.Matrix4x4.mirroring = function(plane) {
+  var nx = plane.normal.x;
+  var ny = plane.normal.y;
+  var nz = plane.normal.z;
+  var w = plane.w;
+  var els = [
+    (1.0-2.0*nx*nx), (-2.0*ny*nx),    (-2.0*nz*nx),    0, 
+    (-2.0*nx*ny),    (1.0-2.0*ny*ny), (-2.0*nz*ny),    0,
+    (-2.0*nx*nz),    (-2.0*ny*nz),    (1.0-2.0*nz*nz), 0, 
+    (-2.0*nx*w),     (-2.0*ny*w),     (-2.0*nz*w),     1  
   ];
   return new CSG.Matrix4x4(els);
 };
@@ -3372,19 +3421,11 @@ CSG.Connector = function(point, axisvector, normalvector) {
   this.normalvector = new CSG.Vector3D(normalvector);
 };
 
-CSG.Connector.test = function() {
-  var con1 = new CSG.Connector([1,2,5], [1,1,0], [1, -0.8, 0]);
-  var con2 = new CSG.Connector([-5,1,-1], [2,3,5], [0,0,1]);
-  var transform = con1.getTransformationTo(con2, false, 0);
-  var check = con1.transform(transform);
-};
-
 CSG.Connector.prototype = {
   normalized: function() {
     var axisvector = this.axisvector.unit();
     // make the normal vector truly normal:
     var n = this.normalvector.cross(axisvector).unit();
-//    var normalvector = n.cross(axisvector);
     var normalvector = axisvector.cross(n);
     return new CSG.Connector(this.point, axisvector, normalvector);
   },
@@ -3396,9 +3437,15 @@ CSG.Connector.prototype = {
     return new CSG.Connector(point, axisvector, normalvector);
   },
   
-  getTransformationTo: function(other, mirror, axisrotation) {
+  // Get the transformation matrix to connect this Connector to another connector
+  //   other: a CSG.Connector to which this connector should be connected
+  //   mirror: false: the 'axis' vectors of the connectors should point in the same direction
+  //           true: the 'axis' vectors of the connectors should point in opposite direction
+  //   normalrotation: degrees of rotation between the 'normal' vectors of the two
+  //                   connectors
+  getTransformationTo: function(other, mirror, normalrotation) {
     mirror = mirror? true:false;
-    axisrotation = axisrotation? Number(axisrotation):0;
+    normalrotation = normalrotation? Number(normalrotation):0;
     var us = this.normalized();
     other = other.normalized();
     // shift to the origin:
@@ -3425,7 +3472,7 @@ CSG.Connector.prototype = {
     angle1 = normalsbasis.to2D(usAxesAligned.normalvector).angle();    
     angle2 = normalsbasis.to2D(other.normalvector).angle(); 
     rotation = 180.0 * (angle2 - angle1) / Math.PI;
-    rotation += axisrotation;
+    rotation += normalrotation;
     transformation = transformation.multiply(normalsbasis.getProjectionMatrix());
     transformation = transformation.multiply(CSG.Matrix4x4.rotationZ(rotation));
     transformation = transformation.multiply(normalsbasis.getInverseProjectionMatrix());

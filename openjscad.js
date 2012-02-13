@@ -206,3 +206,277 @@ OpenJsCad.javaScriptToSolid = function(script) {
   }
   return csg;
 };
+
+// this is a bit of a hack; doesn't properly supports urls that start with '/'
+// but does handle relative urls containing ../
+OpenJsCad.makeAbsoluteUrl = function(url, baseurl) {
+  if(!url.match(/^[a-z]+\:/i))
+  {
+    var basecomps = baseurl.split("/");
+    if(basecomps.length > 0)
+    {
+      basecomps.splice(basecomps.length - 1, 1);
+    }
+    var urlcomps = url.split("/");
+    var comps = basecomps.concat(urlcomps);
+    var comps2 = [];
+    comps.map(function(c) {
+      if(c == "..")
+      {
+        if(comps2.length > 0)
+        {
+          comps2.splice(comps2.length - 1, 1);
+        }
+      }
+      else
+      {
+        comps2.push(c);
+      }
+    });  
+    url = "";
+    for(var i = 0; i < comps2.length; i++)
+    {
+      if(i > 0) url += "/";
+      url += comps2[i];
+    }
+  }
+  return url;
+};
+
+OpenJsCad.isChrome = function()
+{
+  return (navigator.userAgent.search("Chrome") >= 0);
+}
+
+// callback: should be function(error, csg)
+OpenJsCad.javaScriptToSolidASync = function(script, callback) {
+  var baselibraries = [
+    "csg.js",
+    "openjscad.js"
+  ];
+  var baseurl = document.location + "";
+  var workerscript = "";
+  workerscript += script;
+  workerscript += "\n//// END OF USER SUPPLIED SCRIPT\n";
+  workerscript += "var _csg_libraries=" + JSON.stringify(baselibraries)+";\n";
+  workerscript += "var _csg_baseurl=" + JSON.stringify(baseurl)+";\n";
+  workerscript += "var _csg_makeAbsoluteURL=" + OpenJsCad.makeAbsoluteUrl.toString()+";\n";
+  workerscript += "if(typeof(libs) == 'function') _csg_libraries = _csg_libraries.concat(libs());\n";
+  workerscript += "_csg_libraries = _csg_libraries.map(function(l){return _csg_makeAbsoluteURL(l,_csg_baseurl);});\n";
+  //workerscript += "importScripts.call(null, _csg_libraries);\n";
+  workerscript += "_csg_libraries.map(function(l){importScripts(l)});\n";
+  workerscript += "self.addEventListener('message', function(e) {if(e.data && e.data.cmd == 'render'){";
+  workerscript += "  if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid.');\n";
+  workerscript += "  var csg = main(); self.postMessage({cmd: 'rendered', csg: csg});";
+  workerscript += "}},false);\n";
+  
+  var blobURL = OpenJsCad.textToBlobUrl(workerscript);
+  
+  if(!window.Worker) throw new Error("Your browser doesn't support Web Workers");
+  var worker = new Worker(blobURL);
+  worker.onmessage = function(e) {
+    if(e.data && e.data.cmd == 'rendered')
+    {
+      var csg = CSG.fromObject(e.data.csg);
+      callback(null, csg);
+    }
+  };
+  worker.onerror = function(e) {
+    var errtxt = "Error in line "+e.lineno+": "+e.message;
+    callback(errtxt, null);
+  };
+  worker.postMessage({
+    cmd: "render"
+  }); // Start the worker.
+  return worker;
+};
+
+OpenJsCad.textToBlobUrl = function(txt) {
+  var bb;
+  if(window.BlobBuilder) bb = new window.BlobBuilder()
+  else if(window.WebKitBlobBuilder) bb = new window.WebKitBlobBuilder()
+  else if(window.MozBlobBuilder) bb = new window.MozBlobBuilder()
+  else throw new Error("Your browser doesn't support BlobBuilder");
+
+  bb.append(txt);
+  var blob = bb.getBlob();
+  var blobURL;
+  if(window.URL) blobURL = window.URL.createObjectURL(blob)
+  else if(window.webkitURL) blobURL = window.webkitURL.createObjectURL(blob)
+  else throw new Error("Your browser doesn't support window.URL");
+  return blobURL;
+};
+
+OpenJsCad.revokeBlobUrl = function(url) {
+  if(window.URL) window.URL.revokeObjectURL(url)
+  else if(window.webkitURL) window.webkitURL.revokeObjectURL(url)
+  else throw new Error("Your browser doesn't support window.URL");
+};
+
+OpenJsCad.Processor = function(containerdiv, onchange) {
+  this.containerdiv = containerdiv;
+  this.onchange = onchange;
+  this.viewerdiv = null;
+  this.viewer = null;
+  this.viewerwidth = 800;
+  this.viewerheight = 600;
+  this.initialViewerDistance = 50;
+  this.processing = false;
+  this.solid = null;
+  this.validcsg = false;
+  this.hasstl = false;
+  this.worker = null;
+  this.createElements();
+};
+
+OpenJsCad.Processor.prototype = {
+  createElements: function() {
+    while(this.containerdiv.children.length > 0)
+    {
+      this.containerdiv.removeChild(0);
+    }
+    if(!OpenJsCad.isChrome() )
+    {
+      var div = document.createElement("div");
+      div.innerHTML = "Please note: OpenJsCad currently only runs reliably on Google Chrome!";
+      this.containerdiv.appendChild(div);
+    }
+    var viewerdiv = document.createElement("div");
+    viewerdiv.className = "viewer";
+    viewerdiv.style.width = this.viewerwidth + "px";
+    viewerdiv.style.height = this.viewerheight + "px";
+    viewerdiv.style.backgroundColor = "rgb(200,200,200)";
+    this.containerdiv.appendChild(viewerdiv);
+    this.viewerdiv = viewerdiv;
+    try
+    {
+      this.viewer = new OpenJsCad.Viewer(this.viewerdiv, this.viewerwidth, this.viewerheight, this.initialViewerDistance);
+    } catch (e) {
+      this.viewerdiv.innerHTML = e.toString();
+    }
+    this.errordiv = document.createElement("div");
+    this.errordiv.style.display = "none";
+    this.statusdiv = document.createElement("div");
+    this.statusdiv.style.width = this.viewerwidth + "px";
+    this.statusspan = document.createElement("span");
+    this.statusbuttons = document.createElement("div");
+    this.statusbuttons.style.float = "right";
+    this.statusdiv.appendChild(this.statusspan);
+    this.statusdiv.appendChild(this.statusbuttons);
+    this.abortbutton = document.createElement("button");
+    this.abortbutton.innerHTML = "Abort";
+    var that = this;
+    this.abortbutton.onclick = function(e) {
+      that.abort();
+    }
+    this.statusbuttons.appendChild(this.abortbutton);
+    this.generateStlButton = document.createElement("button");
+    this.generateStlButton.innerHTML = "Generate STL";
+    this.generateStlButton.onclick = function(e) {
+      that.generateStl();
+    }
+    this.statusbuttons.appendChild(this.generateStlButton);
+    this.downloadStlLink = document.createElement("a");
+    this.downloadStlLink.innerHTML = "Download STL";
+    this.statusbuttons.appendChild(this.downloadStlLink);
+    this.enableItems();    
+    this.containerdiv.appendChild(this.statusdiv);
+    this.containerdiv.appendChild(this.errordiv);
+    this.clearViewer();
+  },
+  
+  clearViewer: function() {
+    this.clearStl();
+    this.solid = new CSG();
+    if(this.viewer)
+    {
+      this.viewer.setCsg(this.solid);
+    }
+    this.validcsg = false;
+    this.enableItems();
+  },
+  
+  abort: function() {
+    if(this.processing)
+    {
+      //todo: abort
+      this.processing=false;
+      this.statusspan.innerHTML = "Aborted.";
+      this.worker.terminate();
+      this.enableItems();
+      if(this.onchange) this.onchange();
+    }
+  },
+  
+  enableItems: function() {
+    this.abortbutton.style.display = this.processing? "inline":"none";
+    this.generateStlButton.style.display = ((!this.hasstl)&&(this.validcsg))? "inline":"none";
+    this.downloadStlLink.style.display = this.hasstl? "inline":"none";
+  },
+  
+  setError: function(txt) {
+    this.errordiv.innerHTML = txt;
+    this.errordiv.style.display = (txt == "")? "none":"block";    
+  },
+  
+  setJsCad: function(script) {
+    this.abort();
+    this.clearViewer();
+    this.setError("");
+    this.processing = true;
+    this.statusspan.innerHTML = "Processing, please wait...";
+    var that = this;
+    this.worker = OpenJsCad.javaScriptToSolidASync(script, function(err, csg) {
+      that.processing = false;
+      that.worker = null;
+      if(err)
+      {
+        that.setError(err);
+        that.statusspan.innerHTML = "Error.";
+      }
+      else
+      {
+        that.solid = csg;      
+        if(that.viewer) that.viewer.setCsg(csg);
+        that.validcsg = true;
+        that.statusspan.innerHTML = "Ready.";
+      }
+      that.enableItems();
+      if(that.onchange) that.onchange();
+    });
+    this.enableItems();
+    if(this.onchange) this.onchange();
+  },
+  
+  hasSolid: function() {
+    return this.validcsg;
+  },
+
+  isProcessing: function() {
+    return this.processing;
+  },
+  
+  clearStl: function() {
+    if(this.hasstl)
+    {
+      this.hasstl = false;
+      OpenJsCad.revokeBlobUrl(this.stlBlobUrl);
+      this.stlBlobUrl = null;
+      this.enableItems();
+      if(this.onchange) this.onchange();
+    }
+  },
+  
+  generateStl: function() {
+    this.clearStl();
+    if(this.validcsg)
+    {
+      var stltxt = this.solid.toStlString();
+      this.stlBlobUrl = OpenJsCad.textToBlobUrl(stltxt);
+      this.hasstl = true;
+      this.downloadStlLink.href = this.stlBlobUrl;
+      this.enableItems();
+      if(this.onchange) this.onchange();
+    }
+  },
+};
