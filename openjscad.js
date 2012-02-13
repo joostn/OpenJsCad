@@ -329,6 +329,41 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.createElements();
 };
 
+OpenJsCad.FileSystemApiErrorHandler = function(fileError, operation) {
+  var errormap = {
+    1: NOT_FOUND_ERR,
+    2: SECURITY_ERR,
+    3: ABORT_ERR,
+    4: NOT_READABLE_ERR,
+    5: ENCODING_ERR,
+    6: NO_MODIFICATION_ALLOWED_ERR,
+    7: INVALID_STATE_ERR,
+    8: SYNTAX_ERR,
+    9: INVALID_MODIFICATION_ERR,
+    10: QUOTA_EXCEEDED_ERR,
+    11: TYPE_MISMATCH_ERR,
+    12: PATH_EXISTS_ERR,
+  };
+  var errname;
+  if(fileError.code in errormap)
+  {
+    errname = errormap[fileError.code];
+  }
+  else
+  {
+    errname = "Error #"+fileError.code;
+  }
+  var errtxt = "FileSystem API error: "+operation+" returned error "+errname;
+  throw new Error(errtxt);
+};
+
+OpenJsCad.AlertUserOfUncaughtExceptions = function() {
+  window.onerror = function(message, url, line) {
+    message = message.replace(/^Uncaught /i, "");
+    alert(message+"\n\n("+url+" line "+line+")");
+  };
+};
+
 OpenJsCad.Processor.prototype = {
   createElements: function() {
     while(this.containerdiv.children.length > 0)
@@ -419,12 +454,17 @@ OpenJsCad.Processor.prototype = {
     this.errordiv.style.display = (txt == "")? "none":"block";    
   },
   
-  setJsCad: function(script) {
+  // script: javascript code
+  // filename: optional, the name of the .jscad file
+  setJsCad: function(script, filename) {
+    if(!filename) filename = "openjscad.jscad";
+    filename = filename.replace(/\.jscad$/i, "");
     this.abort();
     this.clearViewer();
     this.setError("");
     this.processing = true;
     this.statusspan.innerHTML = "Processing, please wait...";
+    this.filename = filename;
     var that = this;
     this.worker = OpenJsCad.javaScriptToSolidASync(script, function(err, csg) {
       that.processing = false;
@@ -456,7 +496,7 @@ OpenJsCad.Processor.prototype = {
     return this.processing;
   },
   
-  clearStl: function() {
+  clearStl1: function() {
     if(this.hasstl)
     {
       this.hasstl = false;
@@ -467,7 +507,7 @@ OpenJsCad.Processor.prototype = {
     }
   },
   
-  generateStl: function() {
+  generateStl1: function() {
     this.clearStl();
     if(this.validcsg)
     {
@@ -479,4 +519,72 @@ OpenJsCad.Processor.prototype = {
       if(this.onchange) this.onchange();
     }
   },
+  
+  clearStl: function() {
+    if(this.hasstl)
+    {
+      this.hasstl = false;
+      if(that.stlDirEntry)
+      {
+        that.stlDirEntry.removeRecursively();
+        that.stlDirEntry=null;
+      }
+      this.enableItems();
+      if(this.onchange) this.onchange();
+    }
+  },
+  
+  generateStl: function() {
+    this.clearStl();
+    if(this.validcsg)
+    {
+      var stltxt = this.solid.toStlString();
+      window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
+      window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
+      if(!window.requestFileSystem)
+      {
+        throw new Error("Your browser does not support the HTML5 FileSystem API");
+      }
+      if(!window.BlobBuilder)
+      {
+        throw new Error("Your browser does not support the HTML5 BlobBuilder API");
+      }
+      // create a random directory name:
+      var dirname = "OpenJsCadStlOutput_"+parseInt(Math.random()*1000000000, 10)+".stl";
+      var filename = this.filename+".stl";
+      var that = this;
+      window.requestFileSystem(TEMPORARY, 20*1024*1024, function(fs){
+          fs.root.getDirectory(dirname, {create: true, exclusive: true}, function(dirEntry) {
+              that.stlDirEntry = dirEntry;
+              dirEntry.getFile(filename, {create: true, exclusive: true}, function(fileEntry) {
+                   fileEntry.createWriter(function(fileWriter) {
+                      fileWriter.onwriteend = function(e) {
+                        that.hasstl = true;
+                        that.downloadStlLink.href = fileEntry.toURL();
+                        that.enableItems();
+                        if(that.onchange) that.onchange();
+                      };
+                      fileWriter.onerror = function(e) {
+                        throw new Error('Write failed: ' + e.toString());
+                      };
+                      // Create a new Blob and write it to log.txt.
+                      var bb = new window.BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
+                      bb.append(stltxt);
+                      fileWriter.write(bb.getBlob());                
+                    }, 
+                    function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 
+                  );
+                },
+                function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getFile('"+filename+"')");} 
+              );
+            },
+            function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getDirectory('"+dirname+"')");} 
+          );         
+        }, 
+        function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "requestFileSystem");}
+      );
+    }
+  },
+  
+
 };

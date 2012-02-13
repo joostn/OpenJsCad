@@ -8,7 +8,7 @@
 
 body {
   font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 800px;
+  max-width: 820px;
   margin: 0 auto;
   padding: 10px;
 }
@@ -36,7 +36,11 @@ canvas { cursor: move; }
 
   </style>
 <script>
+
 var gProcessor=null;
+
+// Show all exceptions to the user:
+OpenJsCad.AlertUserOfUncaughtExceptions();
 
 function onload()
 {

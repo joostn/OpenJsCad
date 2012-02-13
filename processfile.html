@@ -8,6 +8,7 @@
 
 body {
   font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  max-width: 820px;
 }
 
 pre, code, textarea {
@@ -55,19 +56,17 @@ canvas { cursor: move; }
   </style>
 <script>
 
-var gCurrentFile = null;
 
+var gCurrentFile = null;
 var gProcessor=null;
+
+// Show all exceptions to the user:
+OpenJsCad.AlertUserOfUncaughtExceptions();
 
 function onload()
 {
-  try
-  {
-    gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-    setupDragDrop();
-  } catch (e) {
-    alert(e.toString());
-  }
+  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
+  setupDragDrop();
 }
 
 function setupDragDrop()
@@ -76,7 +75,7 @@ function setupDragDrop()
   if (window.File && window.FileReader && window.FileList) {
     // Great success! All the File APIs are supported.
   } else {
-    alert("Error: Your browser does not fully support the HTML File API");
+    throw new Error("Error: Your browser does not fully support the HTML File API");
   }
   var dropZone = document.getElementById('filedropzone');
   dropZone.addEventListener('dragover', function(evt) {
@@ -89,32 +88,27 @@ function setupDragDrop()
 
 function handleFileSelect(evt)
 {
-  try
+  evt.stopPropagation();
+  evt.preventDefault();
+  
+  if(!evt.dataTransfer) throw new Error("Not a datatransfer (1)");
+  if(!evt.dataTransfer.files) throw new Error("Not a datatransfer (2)");
+  if(evt.dataTransfer.files.length != 1)
   {
-    evt.stopPropagation();
-    evt.preventDefault();
-    
-    if(!evt.dataTransfer) throw new Error("Not a datatransfer (1)");
-    if(!evt.dataTransfer.files) throw new Error("Not a datatransfer (2)");
-    if(evt.dataTransfer.files.length != 1)
-    {
-      throw new Error("Please drop a single .jscad file");
-    }
-    var file = evt.dataTransfer.files[0];
-    if(!file.name.match(/\.jscad$/i))
-    {
-      throw new Error("Please drop a file with .jscad extension");
-    }
-    if(file.size == 0)
-    {
-      throw new Error("You have dropped an empty file");
-    }              
-    gCurrentFile = file;
-    gPreviousModificationTime = "";
-    fileChanged();
-  } catch (e) {
-    alert(e.toString());
+    throw new Error("Please drop a single .jscad file");
   }
+  var file = evt.dataTransfer.files[0];
+  if(!file.name.match(/\.jscad$/i))
+  {
+    throw new Error("Please drop a file with .jscad extension");
+  }
+  if(file.size == 0)
+  {
+    throw new Error("You have dropped an empty file");
+  }              
+  gCurrentFile = file;
+  gPreviousModificationTime = "";
+  fileChanged();
 }
 
 function fileChanged()
@@ -144,33 +138,34 @@ function parseFile()
       var txt = evt.target.result;
     };
     reader.onloadend = function(evt) {
-      try
+      if (evt.target.readyState == FileReader.DONE)
       {
-        if (evt.target.readyState == FileReader.DONE)
+        var jscadscript = evt.target.result;
+        if(jscadscript == "")
         {
-          var jscadscript = evt.target.result;
-          if(jscadscript == "")
+          if(document.location.toString().match(/^file\:\//i))
           {
-            throw new Error("Could not read file. This may be due to security restrictions: in Google Chrome the File API only works if this html page is on a web server. Accessing this page from your hard drive does not work.");
-            if(gProcessor) gProcessor.clearViewer();
+            throw new Error("Could not read file. You are using a local copy of OpenJsCad; if you are using Chrome, you need to launch it with the following command line option:\n\n--allow-file-access-from-files\n\notherwise the browser will not have access to uploaded files due to security restrictions."); 
           }
           else
-          {         
-            if(gProcessor)
-            {
-              gProcessor.setJsCad(jscadscript);
-            }
-          }
+          {
+            throw new Error("Could not read file.");
+          }            
         }
         else
-        {
-          throw new Error("Failed to read file");
-          if(gProcessor) gProcessor.clearViewer();
+        {         
+          if(gProcessor)
+          {
+            var filename = gCurrentFile.name;
+            filename = filename.replace(/^.*\/([^\/]*)$/, "$1");
+            gProcessor.setJsCad(jscadscript, filename);
+          }
         }
       }
-      catch(e)
+      else
       {
-        alert(e.toString());
+        throw new Error("Failed to read file");
+        if(gProcessor) gProcessor.clearViewer();
       }
     };
     reader.readAsText(gCurrentFile, "UTF-8");
