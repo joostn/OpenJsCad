@@ -144,6 +144,15 @@ CSG.prototype = {
     return result;
   },
 
+  // Like union, but when we know that the two solids are not intersecting
+  // Do not use if you are not completely sure that the solids do not intersect!
+  unionForNonIntersecting: function(csg) {
+    var newpolygons = this.polygons.concat(csg.polygons);
+    var result = CSG.fromPolygons(newpolygons);
+    result.properties = this.properties._merge(csg.properties);
+    return result;
+  },
+
   // Return a new CSG solid representing space in this solid but not in the
   // solid `csg`. Neither this solid nor the solid `csg` are modified.
   // 
@@ -2256,6 +2265,10 @@ CSG.Vector2D = function(x, y) {
   {
     throw new Error("wrong arguments");
   }
+};
+
+CSG.Vector2D.fromAngle = function(radians) {
+  return new CSG.Vector2D(Math.cos(radians), Math.sin(radians));
 };
 
 CSG.Vector2D.prototype = {

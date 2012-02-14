@@ -4,7 +4,7 @@
   <script src="lightgl.js"></script>
   <script src="csg.js"></script>
   <script src="openjscad.js"></script>
-  <style>
+<style>
 
 body {
   font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -26,34 +26,12 @@ pre, textarea {
 textarea:focus {
   outline: none;
 }
-#filedropzone {
-  border: 2px dashed #bbb;
-  -moz-border-radius: 5px;
-  -webkit-border-radius: 5px;
-  border-radius: 5px;
-  padding: 15px;
-  color: black;
-}
-
-#filedropzone_empty {
-  text-align: center;
-  color: #bbb;
-}
-
-#filedropzone_filled {
-  color: black;
-  display: none;
-}
-
-#filebuttons {
-  float: right;
-}
 
 a { color: inherit; }
+</style>
 
-canvas { cursor: move; }
+<link rel="stylesheet" href="openjscad.css" type="text/css">
 
-  </style>
 <script>
 
 
@@ -126,10 +104,10 @@ function fileChanged()
     document.getElementById("filedropzone_filled").style.display = "none";
     document.getElementById("filedropzone_empty").style.display = "block";
   }
-  parseFile();
+  parseFile(false);
 }
 
-function parseFile()
+function parseFile(debugging)
 {
   if(gCurrentFile)
   {
@@ -158,6 +136,7 @@ function parseFile()
           {
             var filename = gCurrentFile.name;
             filename = filename.replace(/^.*\/([^\/]*)$/, "$1");
+            gProcessor.setDebugging(debugging); 
             gProcessor.setJsCad(jscadscript, filename);
           }
         }
@@ -184,7 +163,8 @@ function parseFile()
     <span id="currentfile">dfghdfgh</span>
     <div id="filebuttons">
       <button id="getstlbutton" style="display:none" onclick="getStl();">Get STL</button>
-      <button onclick="parseFile();">Reload</button>
+      <button onclick="parseFile(false);">Reload</button>
+      <button onclick="parseFile(true);">Debug (see below)</button>
     </div>
   </div>
 </div>
@@ -207,5 +187,20 @@ When finished press Generate STL to generate the STL file. Then click Save STL a
 a file with .stl extension.
 <br><br>  
 For more information about OpenJsCad see the <a href="index.html">introduction</a>.
+
+<h2>Debugging</h2>
+By default your .jscad file is parsed in a separate thread (in a Web Worker). This allows long running
+scripts to be executed while the web browser stays responsive. The web browser's debugger does not
+have access to scripts running in web workers however. To allow debugging you can use the Debug button above to execute
+your jscad code in the main thread instead of in a web worker.
+<br><br>
+To debug your code in Google Chrome: open the Developer Tools by typing Ctrl+Shift+I (or Command+Option+I on mac).
+Then press the Debug button above. The debugger will stop just before executing your main() function.
+<br><br>
+For more information about debugging in Chrome see 
+<a href="http://code.google.com/chrome/devtools/docs/overview.html" target="_blank">Chrome Developer Tools: Overview</a>
+
+<br><br>
+
 </body>
 </html>

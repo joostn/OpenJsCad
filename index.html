@@ -35,6 +35,8 @@ textarea:focus {
 canvas { cursor: move; }
 
   </style>
+<link rel="stylesheet" href="openjscad.css" type="text/css">
+
 <script>
 
 var gProcessor=null;
@@ -67,7 +69,7 @@ and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>.
 <textarea id="code">
 function main()
 {
-  var resolution = 16; // increase to get smoother corners (will get slow!)
+  var resolution = 24; // increase to get smoother corners (will get slow!)
   
   var cube1 = CSG.roundedCube({center: [0,0,0], radius: [10,10,10], roundradius: 2, resolution: resolution});
   var sphere1 = CSG.sphere({center: [5, 5, 5], radius: 10, resolution: resolution });
@@ -83,7 +85,7 @@ function main()
 </textarea><br>
 <input type="submit" value="Update" onclick="updateSolid(); return false;">
 <br>
-<h1>About</h1>
+<h2>About</h2>
 This is intended to become a Javascript based alternative to <a href="http://www.openscad.org/">OpenSCAD</a>,
 for 3D solid modeling.
 CSG model is contructed using Javascript. For example:<br>
@@ -97,6 +99,23 @@ The code should always contain a main() function, returning a CSG solid.
 To build your own models, create a .jscad file with your javascript code and parse the file using the 
 <a href="processfile.html">OpenJsCad parser</a>. When finished, click on Generate STL and save the result
 in an .stl file, ready to be printed on your 3d printer.
+<h2>Why use OpenJsCad?</h2>
+Some of the benefits:
+<ul>
+<li>Runs in your browser, no need to install any software.</li>
+<li>You can create parametric models with user editable parameters: parameters can be changed in the browser window,
+without the need to edit the source script. See the <a href="gearsdemo.html">Gears demo</a> for example!</li>
+<li>JavaScript is an extremely flexible language, supporting dynamic arrays and object oriented programming.</li>
+<li>Solids are stored in variables. This allows for example conditional cloning of objects, something which is nearly impossible in OpenSCAD.</li>
+<li>Properties and Connectors (see below) make it very easy to attach objects to each other at predetermined
+points, even if you don't know the actual orientation or size.</li>
+</ul>
+<h2>Viewer navigation</h2>
+Click and drag to rotate the model around the origin.<br>
+Shift+Drag moves the model around.<br>
+Alt+drag zooms (by changing the distance between camera and model).
+<h2>Demos</h2>
+Try the <a href="gearsdemo.html">Gears demo</a>!
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
 Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c) 2011 Evan Wallace, 
@@ -109,11 +128,6 @@ know how to modify it as well.<br><br>
 To contribute go to <a href="https://github.com/joostn/csg.js">CSG.js at GitHub</a>,
 <a href="http://help.github.com/fork-a-repo/">create your own fork</a> and 
 <a href="http://help.github.com/send-pull-requests/">send me a pull request</a>.
-<h2>Viewer navigation</h2>
-Click and drag to rotate the model around the origin.<br>
-Shift+Drag moves the model around.<br>
-Alt+drag zooms (by changing the distance between camera and model).
-
 <h2>Primitive solids</h2>
 Currently the following solids are supported. The parameters are passed in an object; most
 parameters are optional. 3D vectors can be passed in an array. If a scalar is passed
@@ -420,6 +434,95 @@ var extruded=shape2d.extrude({
   twistangle: 180,       // top surface is rotated 180 degrees 
   twiststeps: 100        // create 100 slices
 });
+</pre>
+
+<h2>Interactive parametric models</h2>
+It is possible to make certain parameters
+editable in the browser. This allows users not familiar with JavaScript to create customized STL files.
+<br><br>
+To do so, add a function getParameterDefinitions() to your .jscad source. This function should return
+an array with parameter definitions. Currently 4 parameters types are supported: float, int, text and choice.
+The user edited values of the parameters will be supplied as an object parameter to the main() function of your .jscad file.
+<br><br>
+A float, int or text parameter is created by including the following object in the array returned by getParameterDefinitions(): 
+<pre>{
+  name: 'width',
+  type: 'float',                      // or 'text' or 'int'
+  default: 1.23,                      // optional, sets the initial value
+  caption: 'Width of the thingy:',    // optional, displayed left of the input field
+                                      // if omitted, the 'name' is displayed (i.e. 'width')
+}</pre> 
+A 'choice' parameter is created using the following object:
+<pre>{
+  name: 'shape',
+  type: 'choice',
+  values: ["TRI", "SQU", "CIR"],               // these are the values that will be supplied to your script
+  captions: ["Triangle", "Square", "Circle"],  // optional, these values are shown in the listbox
+                                               // if omitted, the items in the 'values' array are used
+  caption: 'Shape:',                           // optional, displayed left of the input field
+  default: "SQU",                              // optional, default selected value
+                                               // if omitted, the first item is selected by default
+}</pre>
+To use the values add an argument to your main() function. This argument will be supplied an object
+with the user edited parameter values:
+<pre>
+function main(params)
+{
+  // custom error checking:
+  if(params.width <= 0) throw new Error("Width should be positive!");
+  
+  if(params.shape == "TRI")
+  {
+    // do something
+  }
+}
+</pre>
+ 
+A complete example:
+<pre>
+function getParameterDefinitions() {
+  return [
+    {
+      name: 'width', 
+      type: 'float', 
+      default: 10,
+      caption: "Width of the cube:", 
+    },
+    {
+      name: 'height', 
+      type: 'float', 
+      default: 14,
+      caption: "Height of the cube:", 
+    },
+    {
+      name: 'depth', 
+      type: 'float', 
+      default: 7,
+      caption: "Depth of the cube:", 
+    },
+    {
+      name: 'rounded', 
+      type: 'choice',
+      caption: 'Round the corners?',
+      values: [0, 1],
+      captions: ["No thanks", "Yes please"], 
+      default: 1,
+    },
+  ];
+}
+
+function main(params) {
+  var result;
+  if(params.rounded == 1)
+  {
+    result = CSG.roundedCube({radius: [params.width, params.height, params.depth], roundradius: 2, resolution: 32});
+  }
+  else
+  {
+    result = CSG.cube({radius: [params.width, params.height, params.depth]});
+  }
+  return result;
+}
 </pre>
 
 </body>
