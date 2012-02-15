@@ -115,7 +115,10 @@ Click and drag to rotate the model around the origin.<br>
 Shift+Drag moves the model around.<br>
 Alt+drag zooms (by changing the distance between camera and model).
 <h2>Demos</h2>
-Try the <a href="gearsdemo.html">Gears demo</a>!
+<ul>
+<li><a href="gearsdemo.html">Involute Gears</a></li>
+<li><a href="hookdemo.html">Parametric S hook</a></li>
+</ul>
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
 Uses CSG.js, <a href="https://github.com/evanw/csg.js">original</a> copyright (c) 2011 Evan Wallace, 
@@ -435,6 +438,7 @@ var extruded=shape2d.extrude({
   twiststeps: 100        // create 100 slices
 });
 </pre>
+For an example of 2D shapes see the <a href="hookdemo.html">Parametric S hook</a> demo.
 
 <h2>2D Paths</h2>
 A path is simply a series of points, connected by lines. A path can be open or closed (an additional line
@@ -553,6 +557,7 @@ function main(params) {
   return result;
 }
 </pre>
+Or see the <a href="gearsdemo.html">Gears demo</a> for another example of interactive parameters.
 
 </body>
 </html>
