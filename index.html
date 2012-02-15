@@ -436,6 +436,35 @@ var extruded=shape2d.extrude({
 });
 </pre>
 
+<h2>2D Paths</h2>
+A path is simply a series of points, connected by lines. A path can be open or closed (an additional line
+is drawn between the first and last point). 2D paths are supported through the CSG.Path2D class.
+<br><br>
+Paths can be contructed either by giving a series of 2D coordinates, or through the CSG.Path2D.arc() function,
+which creates a circular curved path. Paths can be concatenated, the result is a new path.
+<br><br>
+Creating a 3D solid is currently supported by the rectangularExtrude() function. This creates a 3D shape
+by following the path with a 2D rectangle (upright, perpendicular to the path direction).
+<pre>
+var path = new CSG.Path2D([[10,10], [-10,10]], /* closed = */ false);
+var anotherpath = new CSG.Path2D([[-10,-10]]);
+path = path.concat(anotherpath);
+path = path.appendPoint([10,-10]);
+path = path.close(); // close the path
+
+// of course we could simply have done:
+// var path = new CSG.Path2D([[10,10], [-10,10], [-10,-10], [10,-10]], /* closed = */ true);
+
+// Extrude the path by following it with a rectangle (upright, perpendicular to the path direction)
+// Returns a CSG solid
+//   width: width of the extrusion, in the z=0 plane
+//   height: height of the extrusion in the z direction
+//   resolution: number of segments per 360 degrees for the curve in a corner
+//   roundEnds: if true, the ends of the polygon will be rounded, otherwise they will be flat
+var csg = path.rectangularExtrude(3, 4, 16, true);
+return csg;
+</pre>
+
 <h2>Interactive parametric models</h2>
 It is possible to make certain parameters
 editable in the browser. This allows users not familiar with JavaScript to create customized STL files.

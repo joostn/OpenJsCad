@@ -473,6 +473,14 @@ CSG.parseOptionAs3DVector = function(options, optionname, defaultvalue) {
   return result;
 };
 
+// Parse an option and force into a CSG.Vector2D. If a scalar is passed it is converted
+// into a vector with equal x,y
+CSG.parseOptionAs2DVector = function(options, optionname, defaultvalue) {
+  var result = CSG.parseOption(options, optionname, defaultvalue);
+  result = new CSG.Vector2D(result);
+  return result;
+};
+
 CSG.parseOptionAsFloat = function(options, optionname, defaultvalue) {
   var result = CSG.parseOption(options, optionname, defaultvalue);
   if(typeof(result) == "string")
@@ -489,6 +497,18 @@ CSG.parseOptionAsFloat = function(options, optionname, defaultvalue) {
 CSG.parseOptionAsInt = function(options, optionname, defaultvalue) {
   var result = CSG.parseOption(options, optionname, defaultvalue);
   return Number(Math.floor(result));
+};
+
+CSG.parseOptionAsBool = function(options, optionname, defaultvalue) {
+  var result = CSG.parseOption(options, optionname, defaultvalue);
+  if(typeof(result) == "string")
+  {
+    if(result == "true") result = true;
+    if(result == "false") result = false;
+    if(result == 0) result = false;
+  }
+  result = !!result;
+  return result;
 };
 
 // Construct an axis-aligned solid cuboid.
@@ -2268,6 +2288,15 @@ CSG.Vector2D = function(x, y) {
 };
 
 CSG.Vector2D.fromAngle = function(radians) {
+  return CSG.Vector2D.fromAngleRadians(radians);
+};
+
+CSG.Vector2D.fromAngleDegrees = function(degrees) {
+  var radians = Math.PI * degrees / 180;
+  return CSG.Vector2D.fromAngleRadians(radians);
+};
+
+CSG.Vector2D.fromAngleRadians = function(radians) {
   return new CSG.Vector2D(Math.cos(radians), Math.sin(radians));
 };
 
@@ -2337,6 +2366,15 @@ CSG.Vector2D.prototype = {
   },
   
   angle: function() {
+    return this.angleRadians();
+  },
+  
+  angleDegrees: function() {
+    var radians = this.angleRadians();
+    return 180 * radians / Math.PI;
+  },
+  
+  angleRadians: function() {
     // y=sin, x=cos
     return Math.atan2(this.y, this.x);
   },
@@ -3495,3 +3533,315 @@ CSG.Connector.prototype = {
     return transformation;       
   },  
 };
+
+
+//////////////////////////////////////
+
+// # Class Path2D
+
+CSG.Path2D = function(points, closed) {
+  closed = !!closed;
+  points = points || [];
+  // re-parse the points into CSG.Vector2D
+  // and remove any duplicate points
+  var prevpoint = null;
+  if(closed && (points.length > 0))
+  {
+    prevpoint = new CSG.Vector2D(points[points.length-1]);
+  }
+  var newpoints = [];
+  points.map(function(point) {
+    point = new CSG.Vector2D(point); 
+    var skip = false;
+    if(prevpoint !== null)
+    {
+      var distance = point.distanceTo(prevpoint);
+      skip = distance < 1e-5;
+    }
+    if(!skip) newpoints.push(point);
+    prevpoint = point;
+  });
+  this.points = newpoints;
+  this.closed = closed;
+};
+
+/*
+Construct a (part of a) circle. Parameters:
+  options.center: the center point of the arc (CSG.Vector2D or array [x,y])
+  options.radius: the circle radius (float)
+  options.startangle: the starting angle of the arc, in degrees
+    0 degrees corresponds to [1,0]
+    90 degrees to [0,1]
+    and so on
+  options.endangle: the ending angle of the arc, in degrees
+  options.resolution: number of points per 360 degree of rotation
+  options.maketangent: adds two extra tiny line segments at both ends of the circle
+    this ensures that the gradients at the edges are tangent to the circle
+Returns a CSG.Path2D. The path is not closed (even if it is a 360 degree arc).
+close() the resultin path if you want to create a true circle.    
+*/
+CSG.Path2D.arc = function(options) {
+  var center = CSG.parseOptionAs2DVector(options, "center", 0);
+  var radius = CSG.parseOptionAsFloat(options, "radius", 1);
+  var startangle = CSG.parseOptionAsFloat(options, "startangle", 0);
+  var endangle = CSG.parseOptionAsFloat(options, "endangle", 360);
+  var resolution = CSG.parseOptionAsFloat(options, "resolution", 16);
+  var maketangent =CSG.parseOptionAsBool(options, "maketangent", false);
+  // no need to make multiple turns:
+  while(endangle - startangle >= 720)
+  {
+    endangle -= 360;
+  }
+  while(endangle - startangle <= -720)
+  {
+    endangle += 360;
+  }
+  var points = [];
+  var absangledif = Math.abs(endangle-startangle);
+  if(absangledif < 1e-5)
+  {
+    var point = CSG.Vector2D.fromAngle(startangle / 180.0 * Math.PI).times(radius);
+    points.push(point.plus(center));
+  }
+  else
+  {
+    var numsteps = Math.floor(resolution * absangledif / 360) + 1;
+    var edgestepsize = numsteps * 0.5 / absangledif; // step size for half a degree
+    if(edgestepsize > 0.25) edgestepsize = 0.25;
+    var numsteps_mod = maketangent? (numsteps+2):numsteps;
+    for(var i = 0; i <= numsteps_mod; i++)
+    {
+      var step = i;
+      if(maketangent)
+      {
+        step = (i-1)*(numsteps-2*edgestepsize)/numsteps+edgestepsize;
+        if(step < 0) step = 0;
+        if(step > numsteps) step = numsteps;
+      }
+      var angle = startangle + step * (endangle - startangle) / numsteps;
+      var point = CSG.Vector2D.fromAngle(angle / 180.0 * Math.PI).times(radius);
+      points.push(point.plus(center));
+    }
+  }
+  return new CSG.Path2D(points, false);
+};
+
+CSG.Path2D.prototype = {
+  concat: function(otherpath) {
+    if(this.closed || otherpath.closed)
+    {
+      throw new Error("Paths must not be closed");
+    }
+    var newpoints = this.points.concat(otherpath.points);
+    return new CSG.Path2D(newpoints);
+  },
+  
+  appendPoint: function(point) {
+    if(this.closed)
+    {
+      throw new Error("Paths must not be closed");
+    }
+    var newpoints = this.points.concat([point]);
+    return new CSG.Path2D(newpoints);
+  },
+  
+  close: function() {
+    return new CSG.Path2D(this.points, true);
+  },
+
+  // Extrude the path by following it with a rectangle (upright, perpendicular to the path direction)
+  // Returns a CSG solid
+  //   width: width of the extrusion, in the z=0 plane
+  //   height: height of the extrusion in the z direction
+  //   resolution: number of segments per 360 degrees for the curve in a corner
+  //   roundEnds: if true, the ends of the polygon will be rounded, otherwise they will be flat
+  rectangularExtrude: function(width, height, resolution, roundEnds) {
+    var polygon2ds = this.toPolygon2Ds(width/2, resolution, roundEnds);
+    var result = new CSG();
+    var offsetvector = [0, 0, height];
+    polygon2ds.map(function(polygon) {
+      var csg = polygon.extrude({offset: offsetvector});
+      result = result.union(csg);
+    });
+    return result;    
+  },
+  
+  // expand the path (which is just a line with no width) to a 2D shape with a certain path width
+  // Returns an array of CSG.Polygon2D. Note that those polygons may overlap.
+  // pathradius: radius of the path, i.e. half of the diameter of the path
+  // resolution: number of segments per 360 degrees for the curve in a corner
+  // roundEnds: if true, the ends of the polygon will be rounded, otherwise they will be flat
+  toPolygon2Ds: function(pathradius, resolution, roundEnds) {
+    resolution = resolution || 16;
+    roundEnds = !!roundEnds;
+    if(this.closed) roundEnds = false; // a closed curve has no ends
+    if(resolution < 4) resolution = 4;
+    var polygons = [];
+    if(this.points.length >= 1)
+    {
+      for(var i = 0; i < this.points.length; i++)
+      {
+        var previ = i-1;
+        if(previ < 0)
+        {
+          if(this.closed)
+          {
+            previ += this.points.length;
+          }
+          else
+          {
+            if(this.points.length >= 2)
+            {
+              previ = i+1;
+            }
+            else
+            {
+              previ = i;
+            }
+          }
+        }           
+        var prevpoint = this.points[previ];
+        var point = this.points[i];
+        var direction;
+        if(this.points.length >= 2)
+        {
+          direction = point.minus(prevpoint).unit();
+        }
+        else
+        {
+          direction = new CSG.Vector2D(1,0);  // arbitrary
+        }
+        var normal = direction.normal().times(pathradius);        
+        if(this.points.length >= 2)
+        {
+          if( (this.closed) || (i > 0) )
+          {
+            var segpoints = [
+              prevpoint.minus(normal),
+              prevpoint.plus(normal),
+              point.plus(normal),
+              point.minus(normal)
+            ];
+            var polygon = new CSG.Polygon2D(segpoints, null);
+            polygons.push(polygon);
+          }
+        }
+        
+        // make the curved parts between segments and optionally the rounded end:
+        if(roundEnds || this.closed || ((i > 0)&&(i+1 < this.points.length)))
+        {
+          var nexti = i+1;
+          if(nexti >= this.points.length)
+          {
+            if(this.closed) 
+            {
+              nexti = 0;
+            }
+            else
+            {
+              // at the end: go backwards, this will create a rounded end
+              if(this.points.length >= 2)
+              {
+                nexti = i-1;
+              }
+              else
+              {
+                nexti = i;
+              }
+            }
+          }
+          var nextpoint = this.points[nexti];
+          var nextdirection;
+          if(this.points.length >= 2)
+          {
+            nextdirection = nextpoint.minus(point).unit();
+          }
+          else
+          {
+            nextdirection = new CSG.Vector2D(1,0);  // arbitrary
+          }
+          var nextnormal = nextdirection.normal().times(pathradius);        
+          var directionangle = direction.angleDegrees();
+          var nextangle = nextdirection.angleDegrees();
+          if(nextangle > directionangle+180)
+          {
+            nextangle -= 360;
+          }
+          else if(nextangle <= directionangle-180)
+          {
+            nextangle += 360;
+          }
+          if(this.points.length == 1)
+          {
+            nextangle += 360;
+          }
+           
+          
+          var diffangle = nextangle - directionangle;
+          var absdiffangle = Math.abs(diffangle); 
+          if(absdiffangle > 1e-5)
+          {
+            var numsteps = Math.floor(resolution * absdiffangle / 360) + 1;
+            var prevcornerpoint = null;
+            for(var step = 0; step <= numsteps; step++)
+            {
+              var angle = directionangle + step*diffangle/numsteps;
+              if(diffangle > 0)
+              {
+                angle -= 90;
+              }
+              else
+              {
+                angle += 90;
+              }
+              var cornerpoint;
+              if(step == 0)
+              {
+                // first point of curve. To prevent rounding errors, use the exact point
+                if(diffangle > 0)
+                {
+                  cornerpoint = normal;
+                }
+                else
+                {
+                  cornerpoint = normal.negated();
+                }
+              }
+              else if(step == numsteps)
+              {
+                // last point of curve. To prevent rounding errors, use the exact point
+                if(diffangle > 0)
+                {
+                  cornerpoint = nextnormal;
+                }
+                else
+                {
+                  cornerpoint = nextnormal.negated();
+                }
+              }
+              else
+              {
+                cornerpoint = CSG.Vector2D.fromAngleDegrees(angle).times(pathradius);
+              }
+              cornerpoint = cornerpoint.plus(point);
+              if(step > 0)
+              {
+                var polygon = new CSG.Polygon2D([point, prevcornerpoint, cornerpoint], null);
+                polygons.push(polygon);
+              }
+              prevcornerpoint = cornerpoint;
+            } // for step
+          } // if(absdiffangle > 1e-5)
+        } // if( (i+1 < this.points.length) || roundEnds || this.closed)
+      } // for i
+    }     
+    return polygons;
+  },
+  
+  transform: function(matrix4x4) {
+    var newpoints = this.points.map(function(point) {
+      return point.multiply4x4(matrix4x4);
+    });
+    return new CSG.Path2D(newpoints, this.closed);
+  },  
+};                                 
