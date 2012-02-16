@@ -105,10 +105,11 @@ Some of the benefits:
 <li>Runs in your browser, no need to install any software.</li>
 <li>You can create parametric models with user editable parameters: parameters can be changed in the browser window,
 without the need to edit the source script. See the <a href="gearsdemo.html">Gears demo</a> for example!</li>
-<li>JavaScript is an extremely flexible language, supporting dynamic arrays and object oriented programming.</li>
+<li>JavaScript is an extremely flexible language, supporting dynamic arrays, object oriented programming, closures, anonymous functions and more</li>
 <li>Solids are stored in variables. This allows for example conditional cloning of objects, something which is nearly impossible in OpenSCAD.</li>
 <li>Properties and Connectors (see below) make it very easy to attach objects to each other at predetermined
 points, even if you don't know the actual orientation or size.</li>
+<li>Extensive built in <a href="#math">support for 2D and 3D math</a> (classes for Vector2D, Vector3D, Plane, Line3D, Line2D)</li>
 </ul>
 <h2>Viewer navigation</h2>
 Click and drag to rotate the model around the origin.<br>
@@ -191,7 +192,8 @@ var csg3 = cube.subtract(sphere);
 </pre>
 
 <h2>Transformations</h2>
-Solids can be translated, scaled and rotated. Multiple transforms can be combined into a single matrix transform:
+Solids can be translated, scaled and rotated. Multiple transforms can be combined into a single matrix transform.
+For <a href="#math">matrix and vector math see below</a>.
 <pre>
 var cube = CSG.cube();
 
@@ -219,7 +221,7 @@ var cube3 = cube.transform(m);
 </pre>
 
 <h2>Mirroring</h2>
-Solids can be mirrored in any plane in 3D space:
+Solids can be mirrored in any plane in 3D space. For <a href="#math">plane math see below</a>.
 <pre>
 var cube = CSG.cube().translate([1,0,0]);
 
@@ -558,6 +560,130 @@ function main(params) {
 }
 </pre>
 Or see the <a href="gearsdemo.html">Gears demo</a> for another example of interactive parameters.
+
+<h2>Miscellaneous</h2>
+Solids can be given a color using the setColor(r, g, b) function. Beware: this returns a new solid,
+the original solid is not modified! Faces of the solid will keep their original color when doing
+CSG operations (union() etc). Colors values range between 0.0 and 1.0 (not 255).  
+<pre>
+var cube1 = CSG.cube({radius: 10});
+cube1 = cube1.setColor(0.5, 0, 0);
+
+var cube2 = CSG.cube({radius: 10});
+cube2 = cube2.setColor(0, 0.5, 0);
+cube2 = cube2.translate([5,1,4]);
+
+var result = cube1.subtract(cube2);
+// the resulting solid will have faces with 2 different colors
+</pre>
+
+<h2><a name="math"></a>2D and 3D Math</h2>
+There are utility classes for many 2D and 3D operations. Below is a quick summary, for details
+view the source of csg.js:
+<pre>
+// --------- Vector3D ---------------------
+var vec1 = new CSG.Vector3D(1,2,3);       // 3 arguments
+var vec2 = new CSG.Vector3D( [1,2,3] );   // 1 array argument
+var vec3 = new CSG.Vector3D(vec2);        // cloning a vector
+// vector math. All operations return a new vector, the original is unmodified!
+vec.negated()
+vec.abs()
+vec.plus(othervector)
+vec.minus(othervector)
+vec.times(3.0)
+vec.dividedBy(-5)
+vec.dot(othervector)
+vec.lerp(othervector, t)  // linear interpolation (0 <= t <= 1)
+vec.length()
+vec.lengthSquared()       // == vec.length()^2
+vec.unit()
+vec.cross(othervector)    // cross product: returns a vector perpendicular to both
+vec.distanceTo(othervector)
+vec.distanceToSquared(othervector)  // == vec.distanceTo(othervector)^2
+vec.equals(othervector)
+vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
+
+// --------- Vector2D ---------------------
+var vec1 = new CSG.Vector2D(1,2);       // 2 arguments
+var vec2 = new CSG.Vector2D( [1,2] );   // 1 array argument
+var vec3 = new CSG.Vector2D(vec2);      // cloning a vector
+// vector math. All operations return a new vector, the original is unmodified!
+vec.negated()
+vec.abs()
+vec.plus(othervector)
+vec.minus(othervector)
+vec.times(3.0)
+vec.dividedBy(-5)
+vec.dot(othervector)
+vec.lerp(othervector, t)  // linear interpolation (0 <= t <= 1)
+vec.length()
+vec.unit()
+vec.normal()              // returns a 90 degree clockwise rotated vector
+vec.distanceTo(othervector)
+vec.equals(othervector)
+vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
+vec.toVector3D(z)         // convert to a vector3D by adding a z coordinate
+vec.angleDegrees()        // returns the angle of the vector: [1,0] = 0 degrees, [0, 1] = 90 degrees, etc
+vec.angleRadians()        // ditto in radians
+var vec = CSG.Vector2D.fromAngleDegrees(degrees);  // returns a vector at the specified angle
+var vec = CSG.Vector2D.fromAngleRadians(radians);  // returns a vector at the specified angle
+
+// --------- Matrix4x4 ---------------------
+var m1 = new CSG.Matrix4x4();          // unity matrix
+var m2 = new CSG.Matrix4x4( [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] );
+  // elements are passed in row order
+var result = m1.plus(m2); 
+var result = m1.minus(m2);
+var result = m1.multiply(m2);
+// matrix vector multiplication (vectors are padded with zeroes to get a 4x1 vector):
+var vec3d = m1.rightMultiply1x3Vector(vec3d);  // matrix * vector 
+var vec3d = m1.leftMultiply1x3Vector(vec3d);   // vector * matrix
+var vec2d = m1.rightMultiply1x2Vector(vec2d);  // matrix * vector 
+var vec2d = m1.leftMultiply1x2Vector(vec2d);   // vector * matrix
+// common transformation matrices:
+var m = CSG.Matrix4x4.rotationX(degrees);      // matrix for rotation about X axis
+var m = CSG.Matrix4x4.rotationY(degrees);      // matrix for rotation about Y axis
+var m = CSG.Matrix4x4.rotationZ(degrees);      // matrix for rotation about Z axis
+var m = CSG.Matrix4x4.translation(vec3d);      // translation
+var m = CSG.Matrix4x4.scaling(vec3d);          // scale
+var m = CSG.Matrix4x4.mirroring(plane);        // mirroring in a plane; the argument must be a CSG.Plane
+// matrix transformations can be concatenated:
+var transform = CSG.Matrix4x4.rotationX(20).multiply(CSG.Matrix4x4.rotationY(30));
+// Use a CSG solid's transform() method to apply the transformation to a CSG solid
+
+// ------------ Plane --------------------------
+// a 3D plane is represented by a normal vector (should have unit length) and a distance from the origin w 
+// the plane passes through normal.times(w)
+var plane1 = new CSG.Plane(normal, w);         
+// Or we can construct a plane from 3 points:
+var plane2 = CSG.Plane.fromPoints(p1, p2, p3);
+// Or from a normal vector and 1 point:
+var plane3 = CSG.Plane.fromNormalAndPoint(normal, point);
+// Flip a plane (front side becomes back side):
+var plane4 = plane3.flipped();
+// Apply transformations (rotation, scaling, translation):
+var transformed = plane3.transformed(matrix4x4);  // argument is a CSG.Matrix4x4
+// Intersection of plane and 3d line:
+var point = plane3.intersectWithLine(line);        // argument is CSG.Line3D, returns a CSG.Vector3D
+// Intersection of 2 planes:
+var line = plane3.intersectWithPlane(plane);       // argument is another CSG.Plane, returns a CSG.Line3D
+// Distance to point:
+var w = signedDistanceToPoint(point);             // argument is CSG.Vector3D, returns a float (positive
+                                                  //    if in front of plane, negative if in back)
+
+// ------------ Line3D --------------------------
+// A line in 3d space is represented by a point and a direction vector.
+// Direction should be a unit vector. Point can be any point on the line:
+var line = new CSG.Line3D(point, direction);      // argumenst are CSG.Vector3D
+// or by giving two points:
+var line = CSG.Line3D.fromPoints(p1, p2);         // argumenst are CSG.Vector3D
+var point = intersectWithPlane(plane);            // == plane.intersectWithLine(this)
+var line2 = line.reverse();                       // same line but reverse direction
+var line2 = line.transform(matrix4x4);            // for rotation, scaling, etc
+var p = line.closestPointOnLine(point);           // project point onto the line
+var d = line.distanceToPoint(point);
+</pre>
+
 
 </body>
 </html>

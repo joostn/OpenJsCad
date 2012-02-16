@@ -105,7 +105,9 @@ CSG.fromObject = function(obj) {
   var polygons = obj.polygons.map( function(p) {
     return CSG.Polygon.fromObject(p);
   });
-  return CSG.fromPolygons(polygons);
+  var csg = CSG.fromPolygons(polygons);
+  csg = csg.canonicalized();
+  return csg;
 };
 
 CSG.prototype = {
@@ -234,6 +236,7 @@ CSG.prototype = {
     var newpolygons = this.polygons.map(function(p) { return p.transform(matrix4x4); } );
     var result=CSG.fromPolygons(newpolygons); 
     result.properties = this.properties._transform(matrix4x4);
+    result.isRetesselated = this.isRetesselated;
     return result; 
   },
 
@@ -324,6 +327,7 @@ CSG.prototype = {
       var factory = new CSG.fuzzyCSGFactory();
       var result = factory.getCSG(this);
       result.isCanonicalized = true;
+      result.isRetesselated = this.isRetesselated;
       result.properties = this.properties;  // keep original properties
       return result;
     }
@@ -336,10 +340,13 @@ CSG.prototype = {
     }
     else
     {
-      var csg=this; //.canonicalized();
+      var csg=this.canonicalized();
       var polygonsPerPlane = {};
       csg.polygons.map(function(polygon) {
         var planetag = polygon.plane.getTag();
+        var sharedtag = null;
+        if(polygon.shared !== undefined) sharedtag = polygon.shared;
+        planetag += "/"+JSON.stringify(sharedtag);
         if(! (planetag in polygonsPerPlane) )
         {
           polygonsPerPlane[planetag] = [];
@@ -363,6 +370,7 @@ CSG.prototype = {
       }
       var result = CSG.fromPolygons(destpolygons);
       result.isRetesselated = true;
+      result.isCanonicalized = true;
       result.properties = this.properties;  // keep original properties
       return result;
     }
@@ -447,7 +455,27 @@ CSG.prototype = {
   connectTo: function(myConnector, otherConnector, mirror, normalrotation) {
     var matrix = myConnector.getTransformationTo(otherConnector, mirror, normalrotation);
     return this.transform(matrix);
+  },
+  
+  // set the .shared property of all polygons
+  // Returns a new CSG solid, the original is unmodified!
+  setShared: function(shared) {
+    var polygons = this.polygons.map( function(p) {
+      return new CSG.Polygon(p.vertices, shared, p.plane);
+    });
+    var result = CSG.fromPolygons(polygons);
+    result.properties = this.properties;  // keep original properties
+    result.isRetesselated = this.isRetesselated;
+    result.isCanonicalized = this.isCanonicalized;
+    return result;
   }, 
+
+  setColor: function(red,green,blue) {
+    var newshared = {
+      color: [red, green, blue],
+    };
+    return this.setShared(newshared);
+  },
     
 };
 
@@ -1337,7 +1365,7 @@ CSG.Plane.prototype = {
     return result;
   },
 
-  // returns CSG.Point3D
+  // returns CSG.Vector3D
   intersectWithLine: function(line3d) {
     return line3d.intersectWithPlane(this);
   },
@@ -1403,7 +1431,7 @@ CSG.Polygon.fromObject = function(obj) {
   var vertices = obj.vertices.map(function(v) {
     return CSG.Vertex.fromObject(v);
   });
-  var shared = null;
+  var shared = obj.shared;
   var plane = CSG.Plane.fromObject(obj.plane);
   return new CSG.Polygon(vertices, shared, plane);
 };
@@ -1439,7 +1467,7 @@ CSG.Polygon.prototype = {
       sidefacepoints.push(polygon2.vertices[i].pos);
       sidefacepoints.push(polygon2.vertices[nexti].pos);
       sidefacepoints.push(polygon1.vertices[nexti].pos);
-      var sidefacepolygon=CSG.Polygon.createFromPoints(sidefacepoints);
+      var sidefacepolygon=CSG.Polygon.createFromPoints(sidefacepoints, this.shared);
       newpolygons.push(sidefacepolygon);
     }
     polygon2 = polygon2.flipped();
@@ -2435,6 +2463,9 @@ CSG.Polygon2D.prototype = {
     var offsetvector = CSG.parseOptionAs3DVector(options, "offset", [0,0,1]);
     var twistangle = CSG.parseOptionAsFloat(options, "twistangle", 0);
     var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", 10);
+    
+    if(twistangle == 0) twiststeps = 1;
+    if(twiststeps < 1) twiststeps = 1;
 
     // create the polygons:        
     var newpolygons = [];
@@ -2784,6 +2815,7 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons)
   if(numpolygons > 0)
   {
     var plane = sourcepolygons[0].plane;
+    var shared = sourcepolygons[0].shared;
     var orthobasis = new CSG.OrthoNormalBasis(plane);
     var polygonvertices2d = [];    // array of array of CSG.Vector2D
     var polygontopvertexindexes = []; // array of indexes of topmost vertex per polygon
@@ -3108,7 +3140,6 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons)
                 var vertex3d = new CSG.Vertex(point3d);
                 vertices3d.push(vertex3d);              
               });
-              var shared = null;
               var polygon = new CSG.Polygon(vertices3d, shared, plane);
               destpolygons.push(polygon);
             }
@@ -3661,8 +3692,9 @@ CSG.Path2D.prototype = {
     var offsetvector = [0, 0, height];
     polygon2ds.map(function(polygon) {
       var csg = polygon.extrude({offset: offsetvector});
-      result = result.union(csg);
+      result = result.unionSub(csg, false, false);
     });
+    result = result.reTesselated().canonicalized();
     return result;    
   },
   

@@ -169,6 +169,11 @@ OpenJsCad.Viewer.csgToMesh = function(csg) {
   for(var polygonindex = 0; polygonindex < numpolygons; polygonindex++)
   {
     var polygon = polygons[polygonindex];
+    var color = [0,0,1];
+    if(polygon.shared && polygon.shared.color)
+    {
+      color = polygon.shared.color;
+    }
     var indices = polygon.vertices.map(function(vertex) {
       var vertextag = vertex.getTag();
       var vertexindex;
@@ -181,7 +186,7 @@ OpenJsCad.Viewer.csgToMesh = function(csg) {
         vertexindex = vertices.length;
         vertexTag2Index[vertextag] = vertexindex;
         vertices.push([vertex.pos.x, vertex.pos.y, vertex.pos.z]);
-        colors.push([0,0,1]);
+        colors.push(color);
       }
       return vertexindex;
     });
@@ -254,22 +259,29 @@ OpenJsCad.runMainInWorker = function(mainParameters)
   }
   catch(e)
   {
-    var errtxt = e.stack; 
+    var errtxt = e.stack;
+    if(!errtxt)
+    {
+      errtxt = e.toString();
+    } 
     self.postMessage({cmd: 'error', err: errtxt});
   }
 };
 
-OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, callback) {
+OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
   var workerscript = "";
   workerscript += script;
-  workerscript += "\n\n\n\n\n\n\n/* -------------------------------------------------------------------------\n";
-  workerscript += "OpenJsCad debugging\n\nAssuming you are running Chrome:\nF10 steps over an instruction\nF11 steps into an instruction\n";
-  workerscript += "F8  continues running\nPress the (||) button at the bottom to enable pausing whenever an error occurs\n";
-  workerscript += "Click on a line number to set or clear a breakpoint\n";
-  workerscript += "For more information see: http://code.google.com/chrome/devtools/docs/overview.html\n\n";
-  workerscript += "------------------------------------------------------------------------- */\n"; 
-  workerscript += "\n\n// Now press F11 twice to enter your main() function:\n\n";
-  workerscript += "debugger;\n";
+  if(debugging)
+  {
+    workerscript += "\n\n\n\n\n\n\n/* -------------------------------------------------------------------------\n";
+    workerscript += "OpenJsCad debugging\n\nAssuming you are running Chrome:\nF10 steps over an instruction\nF11 steps into an instruction\n";
+    workerscript += "F8  continues running\nPress the (||) button at the bottom to enable pausing whenever an error occurs\n";
+    workerscript += "Click on a line number to set or clear a breakpoint\n";
+    workerscript += "For more information see: http://code.google.com/chrome/devtools/docs/overview.html\n\n";
+    workerscript += "------------------------------------------------------------------------- */\n"; 
+    workerscript += "\n\n// Now press F11 twice to enter your main() function:\n\n";
+    workerscript += "debugger;\n";
+  }
   workerscript += "return main("+JSON.stringify(mainParameters)+");";  
   var f = new Function(workerscript);
   var csg = f();
@@ -341,6 +353,7 @@ OpenJsCad.textToBlobUrl = function(txt) {
   if(window.URL) blobURL = window.URL.createObjectURL(blob)
   else if(window.webkitURL) blobURL = window.webkitURL.createObjectURL(blob)
   else throw new Error("Your browser doesn't support window.URL");
+  if(!blobURL) throw new Error("createObjectURL() failed"); 
   return blobURL;
 };
 
@@ -638,11 +651,41 @@ OpenJsCad.Processor.prototype = {
     this.enableItems();
     var that = this;
     var paramValues = this.getParamValues();
-    if(this.debugging)
+    var useSync = this.debugging;
+    if(!useSync)
     {
       try
       {
-        var csg = OpenJsCad.javaScriptToSolidSync(this.script, paramValues);
+        this.worker = OpenJsCad.javaScriptToSolidASync(this.script, paramValues, function(err, csg) {
+          that.processing = false;
+          that.worker = null;
+          if(err)
+          {
+            that.setError(err);
+            that.statusspan.innerHTML = "Error.";
+          }
+          else
+          {
+            that.solid = csg;      
+            if(that.viewer) that.viewer.setCsg(csg);
+            that.validcsg = true;
+            that.statusspan.innerHTML = "Ready.";
+          }
+          that.enableItems();
+          if(that.onchange) that.onchange();
+        });
+      }
+      catch(e)
+      {
+        useSync = true;
+      }
+    }
+    
+    if(useSync)
+    {
+      try
+      {
+        var csg = OpenJsCad.javaScriptToSolidSync(this.script, paramValues, this.debugging);
         that.processing = false;
         that.solid = csg;      
         if(that.viewer) that.viewer.setCsg(csg);
@@ -652,32 +695,16 @@ OpenJsCad.Processor.prototype = {
       catch(e)
       {
         that.processing = false;
-        that.setError(e.toString());
+        var errtxt = e.stack;
+        if(!errtxt)
+        {
+          errtxt = e.toString();
+        }
+        that.setError(errtxt);
         that.statusspan.innerHTML = "Error.";
       }
       that.enableItems();
       if(that.onchange) that.onchange();
-    }
-    else
-    {
-      this.worker = OpenJsCad.javaScriptToSolidASync(this.script, paramValues, function(err, csg) {
-        that.processing = false;
-        that.worker = null;
-        if(err)
-        {
-          that.setError(err);
-          that.statusspan.innerHTML = "Error.";
-        }
-        else
-        {
-          that.solid = csg;      
-          if(that.viewer) that.viewer.setCsg(csg);
-          that.validcsg = true;
-          that.statusspan.innerHTML = "Ready.";
-        }
-        that.enableItems();
-        if(that.onchange) that.onchange();
-      });
     }
   },
   
