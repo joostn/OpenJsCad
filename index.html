@@ -120,7 +120,8 @@ Alt+drag zooms (by changing the distance between camera and model).
 <h2>Demos</h2>
 <ul>
 <li><a href="gearsdemo.html">Involute Gears</a></li>
-<li><a href="hookdemo.html">Parametric S hook</a></li>
+<li><a href="hookdemo.html">Parametric S hook</a>: shows how to extrude 2d paths</li>
+<li><a href="servodemo.html">Servo motor</a>: shows how to work with properties and connectors</li>
 </ul>
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
@@ -329,6 +330,7 @@ cube.properties.otherCorners = [
 cube.properties.myProperties = new CSG.Properties();
 cube.properties.myProperties.someProperty = new CSG.Vector3D([-1, -1, -1]);
 </pre>
+For an example see the <a href="servodemo.html">Servo motor</a> demo.
 
 <h2>Connectors</h2>
 The CSG.Connector class is intended to facilitate 
@@ -398,6 +400,7 @@ cube2 = cube2.transform(matrix);
 var result = cube2.union(cube1);
 
 </pre>
+For a more complete example see the <a href="servodemo.html">Servo motor</a> demo.
 
 <h2>Determining the bounds of an object</h2>
 The getBounds() function can be used to retrieve the bounding box of an object.
