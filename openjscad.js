@@ -4,87 +4,81 @@ OpenJsCad = function() {
 // A viewer is a WebGL canvas that lets the user view a mesh. The user can
 // tumble it around by dragging the mouse.
 OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
-  try
-  {
-    var gl = GL.create();
-    this.gl = gl;
-    this.angleX = 0;
-    this.angleY = 0;
-    this.viewpointX = 0;
-    this.viewpointY = 0;
-    this.viewpointZ = initialdepth;
+  var gl = GL.create();
+  this.gl = gl;
+  this.angleX = 0;
+  this.angleY = 0;
+  this.viewpointX = 0;
+  this.viewpointY = 0;
+  this.viewpointZ = initialdepth;
 
-    // Draw triangle lines:
-    this.drawLines = false;
-    // Set to true so lines don't use the depth buffer
-    this.lineOverlay = false;
-  
-    // Set up the viewport
-    gl.canvas.width = width;
-    gl.canvas.height = height;
-    gl.viewport(0, 0, width, height);
-    gl.matrixMode(gl.PROJECTION);
-    gl.loadIdentity();
-    gl.perspective(45, width / height, 0.5, 1000);
-    gl.matrixMode(gl.MODELVIEW);
-  
-    // Set up WebGL state
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.clearColor(0.93, 0.93, 0.93, 1);
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
-    gl.polygonOffset(1, 1);
-  
-    // Black shader for wireframe
-    this.blackShader = new GL.Shader('\
-      void main() {\
-        gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
-      }\
-    ', '\
-      void main() {\
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.1);\
-      }\
-    ');
-  
-    // Shader with diffuse and specular lighting
-    this.lightingShader = new GL.Shader('\
-      varying vec3 color;\
-      varying vec3 normal;\
-      varying vec3 light;\
-      void main() {\
-        const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
-        light = lightDir;\
-        color = gl_Color.rgb;\
-        normal = gl_NormalMatrix * gl_Normal;\
-        gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
-      }\
-    ', '\
-      varying vec3 color;\
-      varying vec3 normal;\
-      varying vec3 light;\
-      void main() {\
-        vec3 n = normalize(normal);\
-        float diffuse = max(0.0, dot(light, n));\
-        float specular = pow(max(0.0, -reflect(light, n).z), 10.0) * sqrt(diffuse);\
-        gl_FragColor = vec4(mix(color * (0.3 + 0.7 * diffuse), vec3(1.0), specular), 1.0);\
-      }\
-    ');
+  // Draw triangle lines:
+  this.drawLines = false;
+  // Set to true so lines don't use the depth buffer
+  this.lineOverlay = false;
 
-    containerelement.appendChild(gl.canvas);  
-  
-    var _this=this;
+  // Set up the viewport
+  gl.canvas.width = width;
+  gl.canvas.height = height;
+  gl.viewport(0, 0, width, height);
+  gl.matrixMode(gl.PROJECTION);
+  gl.loadIdentity();
+  gl.perspective(45, width / height, 0.5, 1000);
+  gl.matrixMode(gl.MODELVIEW);
 
-    gl.onmousemove = function(e) {
-      _this.onMouseMove(e);
-    };
-    gl.ondraw = function() {
-      _this.onDraw();
-    };
-    this.clear();
-  }
-  catch (e) {
-    containerelement.innerHTML = "<b><br><br>Error: "+e.toString()+"</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
-  }
+  // Set up WebGL state
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.clearColor(0.93, 0.93, 0.93, 1);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.polygonOffset(1, 1);
+
+  // Black shader for wireframe
+  this.blackShader = new GL.Shader('\
+    void main() {\
+      gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+    }\
+  ', '\
+    void main() {\
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 0.1);\
+    }\
+  ');
+
+  // Shader with diffuse and specular lighting
+  this.lightingShader = new GL.Shader('\
+    varying vec3 color;\
+    varying vec3 normal;\
+    varying vec3 light;\
+    void main() {\
+      const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
+      light = lightDir;\
+      color = gl_Color.rgb;\
+      normal = gl_NormalMatrix * gl_Normal;\
+      gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+    }\
+  ', '\
+    varying vec3 color;\
+    varying vec3 normal;\
+    varying vec3 light;\
+    void main() {\
+      vec3 n = normalize(normal);\
+      float diffuse = max(0.0, dot(light, n));\
+      float specular = pow(max(0.0, -reflect(light, n).z), 10.0) * sqrt(diffuse);\
+      gl_FragColor = vec4(mix(color * (0.3 + 0.7 * diffuse), vec3(1.0), specular), 1.0);\
+    }\
+  ');
+
+  containerelement.appendChild(gl.canvas);  
+
+  var _this=this;
+
+  gl.onmousemove = function(e) {
+    _this.onMouseMove(e);
+  };
+  gl.ondraw = function() {
+    _this.onDraw();
+  };
+  this.clear();
 };
 
 OpenJsCad.Viewer.prototype = {
@@ -470,7 +464,9 @@ OpenJsCad.Processor.prototype = {
     {
       this.viewer = new OpenJsCad.Viewer(this.viewerdiv, this.viewerwidth, this.viewerheight, this.initialViewerDistance);
     } catch (e) {
-      this.viewerdiv.innerHTML = e.toString();
+//      this.viewer = null;
+      this.viewerdiv.innerHTML = "<b><br><br>Error: "+e.toString()+"</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
+//      this.viewerdiv.innerHTML = e.toString();
     }
     this.errordiv = document.createElement("div");
     this.errorpre = document.createElement("pre"); 
@@ -728,18 +724,6 @@ OpenJsCad.Processor.prototype = {
     }
   },
   
-  generateStl1: function() {
-    this.clearStl();
-    if(this.validcsg)
-    {
-      var stltxt = this.solid.toStlString();
-      this.stlBlobUrl = OpenJsCad.textToBlobUrl(stltxt);
-      this.hasstl = true;
-      this.downloadStlLink.href = this.stlBlobUrl;
-      this.enableItems();
-      if(this.onchange) this.onchange();
-    }
-  },
 */
   
   clearStl: function() {
@@ -751,61 +735,86 @@ OpenJsCad.Processor.prototype = {
         this.stlDirEntry.removeRecursively(function(){});
         this.stlDirEntry=null;
       }
+      if(this.stlBlobUrl)
+      {
+        OpenJsCad.revokeBlobUrl(this.stlBlobUrl);
+        this.stlBlobUrl = null;
+      }
       this.enableItems();
       if(this.onchange) this.onchange();
     }
   },
-  
+
   generateStl: function() {
     this.clearStl();
     if(this.validcsg)
     {
-      var stltxt = this.solid.toStlString();
-      window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
-      window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
-      if(!window.requestFileSystem)
+      try
       {
-        throw new Error("Your browser does not support the HTML5 FileSystem API. Please try the Chrome browser instead.");
+        this.generateStlFileSystem();
       }
-      if(!window.BlobBuilder)
+      catch(e)
       {
-        throw new Error("Your browser does not support the HTML5 BlobBuilder API. Please try the Chrome browser instead.");
+        this.generateStlBlobUrl();
       }
-      // create a random directory name:
-      var dirname = "OpenJsCadStlOutput1_"+parseInt(Math.random()*1000000000, 10)+".stl";
-      var filename = this.filename+".stl";
-      var that = this;
-      window.requestFileSystem(TEMPORARY, 20*1024*1024, function(fs){
-          fs.root.getDirectory(dirname, {create: true, exclusive: true}, function(dirEntry) {
-              that.stlDirEntry = dirEntry;
-              dirEntry.getFile(filename, {create: true, exclusive: true}, function(fileEntry) {
-                   fileEntry.createWriter(function(fileWriter) {
-                      fileWriter.onwriteend = function(e) {
-                        that.hasstl = true;
-                        that.downloadStlLink.href = fileEntry.toURL();
-                        that.enableItems();
-                        if(that.onchange) that.onchange();
-                      };
-                      fileWriter.onerror = function(e) {
-                        throw new Error('Write failed: ' + e.toString());
-                      };
-                      // Create a new Blob and write it to log.txt.
-                      var bb = new window.BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
-                      bb.append(stltxt);
-                      fileWriter.write(bb.getBlob());                
-                    }, 
-                    function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 
-                  );
-                },
-                function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getFile('"+filename+"')");} 
-              );
-            },
-            function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getDirectory('"+dirname+"')");} 
-          );         
-        }, 
-        function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "requestFileSystem");}
-      );
     }
+  },
+  
+  generateStlBlobUrl: function() {
+    var stltxt = this.solid.toStlString();
+    this.stlBlobUrl = OpenJsCad.textToBlobUrl(stltxt);
+    this.hasstl = true;
+    this.downloadStlLink.href = this.stlBlobUrl;
+    this.enableItems();
+    if(this.onchange) this.onchange();
+  },
+
+  generateStlFileSystem: function() {
+    var stltxt = this.solid.toStlString();
+    window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
+    window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
+    if(!window.requestFileSystem)
+    {
+      throw new Error("Your browser does not support the HTML5 FileSystem API. Please try the Chrome browser instead.");
+    }
+    if(!window.BlobBuilder)
+    {
+      throw new Error("Your browser does not support the HTML5 BlobBuilder API. Please try the Chrome browser instead.");
+    }
+    // create a random directory name:
+    var dirname = "OpenJsCadStlOutput1_"+parseInt(Math.random()*1000000000, 10)+".stl";
+    var filename = this.filename+".stl";
+    var that = this;
+    window.requestFileSystem(TEMPORARY, 20*1024*1024, function(fs){
+        fs.root.getDirectory(dirname, {create: true, exclusive: true}, function(dirEntry) {
+            that.stlDirEntry = dirEntry;
+            dirEntry.getFile(filename, {create: true, exclusive: true}, function(fileEntry) {
+                 fileEntry.createWriter(function(fileWriter) {
+                    fileWriter.onwriteend = function(e) {
+                      that.hasstl = true;
+                      that.downloadStlLink.href = fileEntry.toURL();
+                      that.enableItems();
+                      if(that.onchange) that.onchange();
+                    };
+                    fileWriter.onerror = function(e) {
+                      throw new Error('Write failed: ' + e.toString());
+                    };
+                    // Create a new Blob and write it to log.txt.
+                    var bb = new window.BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
+                    bb.append(stltxt);
+                    fileWriter.write(bb.getBlob());                
+                  }, 
+                  function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 
+                );
+              },
+              function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getFile('"+filename+"')");} 
+            );
+          },
+          function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getDirectory('"+dirname+"')");} 
+        );         
+      }, 
+      function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "requestFileSystem");}
+    );
   },
   
   createParamControls: function() {

@@ -773,6 +773,7 @@ CSG.roundedCylinder = function(options) {
       for(var slice2 = 0; slice2 <= qresolution; slice2++)
       {
         var pitch = 0.5 * Math.PI * slice2 / qresolution;
+        //var pitch = Math.asin(slice2/qresolution);
         var cospitch = Math.cos(pitch);
         var sinpitch = Math.sin(pitch);
         if(slice2 > 0)

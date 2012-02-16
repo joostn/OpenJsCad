@@ -110,6 +110,8 @@ without the need to edit the source script. See the <a href="gearsdemo.html">Gea
 <li>Properties and Connectors (see below) make it very easy to attach objects to each other at predetermined
 points, even if you don't know the actual orientation or size.</li>
 <li>Extensive built in <a href="#math">support for 2D and 3D math</a> (classes for Vector2D, Vector3D, Plane, Line3D, Line2D)</li>
+<li>Debugging support: step through your code, set breakpoints, inspect variables, etc. See the 
+    <a href="processfile.html">OpenJsCad parser</a> for details.</li>
 </ul>
 <h2>Viewer navigation</h2>
 Click and drag to rotate the model around the origin.<br>
@@ -278,7 +280,7 @@ var rounded = csg.expand(0.2, 8);
 </pre>
 
 <h2>Using Properties</h2>
-The 'property' property of a solid can be used to store metdata for the object,
+The 'property' property of a solid can be used to store metadata for the object,
 for example the coordinate of a specific point of interest of the solid. Whenever
 the object is transformed (i.e. rotated, scaled or translated), the properties 
 are transformed with it. So the property will keep pointing to the same point
