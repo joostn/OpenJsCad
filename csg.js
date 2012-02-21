@@ -530,7 +530,6 @@ CSG.prototype = {
   // returns true if there is a possibility that the two solids overlap
   // returns false if we can be sure that they do not overlap
   mayOverlap: function(csg) {
-  return true;
     if( (this.polygons.length == 0) || (csg.polygons.length == 0) )
     {
       return false;
@@ -679,16 +678,16 @@ CSG.prototype = {
     var verticesArrayIndex = 0;
     vertices.map(function(v){
       var pos = v.pos;
-      vertexData[verticesArrayIndex++] = pos.x; 
-      vertexData[verticesArrayIndex++] = pos.y; 
-      vertexData[verticesArrayIndex++] = pos.z; 
+      vertexData[verticesArrayIndex++] = pos._x; 
+      vertexData[verticesArrayIndex++] = pos._y; 
+      vertexData[verticesArrayIndex++] = pos._z; 
     });
     var planesArrayIndex = 0;
     planes.map(function(p){
       var normal = p.normal;
-      planeData[planesArrayIndex++] = normal.x; 
-      planeData[planesArrayIndex++] = normal.y; 
-      planeData[planesArrayIndex++] = normal.z;
+      planeData[planesArrayIndex++] = normal._x; 
+      planeData[planesArrayIndex++] = normal._y; 
+      planeData[planesArrayIndex++] = normal._z;
       planeData[planesArrayIndex++] = p.w;
     });
     var result = {
@@ -1132,15 +1131,11 @@ CSG.roundedCube = function(options) {
 //     new CSG.Vector3D({ x: 1, y: 2, z: 3 });
 
 CSG.Vector3D = function(x, y, z) {
-  var value = []; //new Float64Array(3);
   if (arguments.length == 3)
   {
-//    this.x = Number(x);
-//    this.y = Number(y);
-//    this.z = Number(z);
-    value[0] = x;
-    value[1] = y;
-    value[2] = z;
+    this._x = x;
+    this._y = y;
+    this._z = z;
   }
   else
   {
@@ -1151,28 +1146,30 @@ CSG.Vector3D = function(x, y, z) {
       {
         if(x instanceof CSG.Vector3D)
         {
-          value = x.value;
+          this._x = x._x;
+          this._y = x._y;
+          this._z = x._z;
         }
         else if(x instanceof Array)
         {
-          value[0] = x[0];
-          value[1] = x[1];
-          value[2] = x[2];
+          this._x = x[0];
+          this._y = x[1];
+          this._z = x[2];
         }  
         else if( ('x' in x) && ('y' in x) && ('z' in x) )
         {
-          value[0] = x.x;
-          value[1] = x.y;
-          value[2] = x.z;
+          this._x = x.x;
+          this._y = x.y;
+          this._z = x.z;
         }
         else ok = false;
       }
       else
       {
         var v = Number(x);
-        value[0] = v;
-        value[1] = v;
-        value[2] = v;
+        this._x = v;
+        this._y = v;
+        this._z = v;
       }
     }
     else ok = false;
@@ -1181,18 +1178,17 @@ CSG.Vector3D = function(x, y, z) {
       throw new Error("wrong arguments");
     }
   }
-  this.value = value;
 };
 
 CSG.Vector3D.prototype = {
   get x() {
-    return this.value[0];
+    return this._x;
   },
   get y() {
-    return this.value[1];
+    return this._y;
   },
   get z() {
-    return this.value[2];
+    return this._z;
   },
   
   set x(v) {
@@ -1210,31 +1206,31 @@ CSG.Vector3D.prototype = {
   },
 
   negated: function() {
-    return new CSG.Vector3D(-this.value[0], -this.value[1], -this.value[2]);
+    return new CSG.Vector3D(-this._x, -this._y, -this._z);
   },
 
   abs: function() {
-    return new CSG.Vector3D(Math.abs(this.value[0]), Math.abs(this.value[1]), Math.abs(this.value[2]));
+    return new CSG.Vector3D(Math.abs(this._x), Math.abs(this._y), Math.abs(this._z));
   },
 
   plus: function(a) {
-    return new CSG.Vector3D(this.value[0] + a.value[0], this.value[1] + a.value[1], this.value[2] + a.value[2]);
+    return new CSG.Vector3D(this._x + a._x, this._y + a._y, this._z + a._z);
   },
 
   minus: function(a) {
-    return new CSG.Vector3D(this.value[0] - a.value[0], this.value[1] - a.value[1], this.value[2] - a.value[2]);
+    return new CSG.Vector3D(this._x - a._x, this._y - a._y, this._z - a._z);
   },
 
   times: function(a) {
-    return new CSG.Vector3D(this.value[0] * a, this.value[1] * a, this.value[2] * a);
+    return new CSG.Vector3D(this._x * a, this._y * a, this._z * a);
   },
 
   dividedBy: function(a) {
-    return new CSG.Vector3D(this.value[0] / a, this.value[1] / a, this.value[2] / a);
+    return new CSG.Vector3D(this._x / a, this._y / a, this._z / a);
   },
 
   dot: function(a) {
-    return this.value[0] * a.value[0] + this.value[1] * a.value[1] + this.value[2] * a.value[2];
+    return this._x * a._x + this._y * a._y + this._z * a._z;
   },
 
   lerp: function(a, t) {
@@ -1255,9 +1251,9 @@ CSG.Vector3D.prototype = {
 
   cross: function(a) {
     return new CSG.Vector3D(
-      this.value[1] * a.value[2] - this.value[2] * a.value[1],
-      this.value[2] * a.value[0] - this.value[0] * a.value[2],
-      this.value[0] * a.value[1] - this.value[1] * a.value[0]
+      this._y * a._z - this._z * a._y,
+      this._z * a._x - this._x * a._z,
+      this._x * a._y - this._y * a._x
     );
   },
   
@@ -1270,7 +1266,7 @@ CSG.Vector3D.prototype = {
   },
 
   equals: function(a) {
-    return (this.value[0] == a.value[0]) && (this.value[1] == a.value[1]) && (this.value[2] == a.value[2]);
+    return (this._x == a._x) && (this._y == a._y) && (this._z == a._z);
   },
   
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
@@ -1284,21 +1280,21 @@ CSG.Vector3D.prototype = {
   },
   
   toStlString: function() {
-    return this.value[0]+" "+this.value[1]+" "+this.value[2];
+    return this._x+" "+this._y+" "+this._z;
   },
   
   toString: function() {
-    return "("+this.value[0]+", "+this.value[1]+", "+this.value[2]+")";
+    return "("+this._x+", "+this._y+", "+this._z+")";
   },
   
   // find a vector that is somewhat perpendicular to this one
   randomNonParallelVector: function() {
     var abs = this.abs();
-    if( (abs.value[0] <= abs.value[1]) && (abs.value[0] <= abs.value[2]) )
+    if( (abs._x <= abs._y) && (abs._x <= abs._z) )
     {
       return new CSG.Vector3D(1,0,0);
     }
-    else if( (abs.value[1] <= abs.value[0]) && (abs.value[1] <= abs.value[2]) )
+    else if( (abs._y <= abs._x) && (abs._y <= abs._z) )
     {
       return new CSG.Vector3D(0,1,0);
     }
@@ -1310,17 +1306,17 @@ CSG.Vector3D.prototype = {
   
   min: function(p) {
     return new CSG.Vector3D(
-      Math.min(this.value[0], p.value[0]),
-      Math.min(this.value[1], p.value[1]),
-      Math.min(this.value[2], p.value[2])
+      Math.min(this._x, p._x),
+      Math.min(this._y, p._y),
+      Math.min(this._z, p._z)
     );
   },
   
   max: function(p) {
     return new CSG.Vector3D(
-      Math.max(this.value[0], p.value[0]),
-      Math.max(this.value[1], p.value[1]),
-      Math.max(this.value[2], p.value[2])
+      Math.max(this._x, p._x),
+      Math.max(this._y, p._y),
+      Math.max(this._z, p._z)
     );
   },
 };
@@ -2071,7 +2067,6 @@ CSG.PolygonTreeNode.prototype = {
         var planenormal = plane.normal;
         var spherecenter = bound[0];
         var d = planenormal.dot(spherecenter) - plane.w;
-//        var d = planenormal.x*spherecenter.x + planenormal.y*spherecenter.y + planenormal.z*spherecenter.z - plane.w; 
         if(d > sphereradius)
         {
           frontnodes.push(this);
@@ -2432,9 +2427,9 @@ CSG.Matrix4x4.prototype = {
   // (result = M*v)
   // Fourth element is taken as 1
   rightMultiply1x3Vector: function(v) {
-    var v0 = v.x;
-    var v1 = v.y;
-    var v2 = v.z;
+    var v0 = v._x;
+    var v1 = v._y;
+    var v2 = v._z;
     var v3 = 1;    
     var x = v0*this.elements[0] + v1*this.elements[1] + v2*this.elements[2] + v3*this.elements[3];    
     var y = v0*this.elements[4] + v1*this.elements[5] + v2*this.elements[6] + v3*this.elements[7];    
@@ -2455,9 +2450,9 @@ CSG.Matrix4x4.prototype = {
   // (result = v*M)
   // Fourth element is taken as 1
   leftMultiply1x3Vector: function(v) {
-    var v0 = v.x;
-    var v1 = v.y;
-    var v2 = v.z;
+    var v0 = v._x;
+    var v1 = v._y;
+    var v2 = v._z;
     var v3 = 1;    
     var x = v0*this.elements[0] + v1*this.elements[4] + v2*this.elements[8] + v3*this.elements[12];    
     var y = v0*this.elements[1] + v1*this.elements[5] + v2*this.elements[9] + v3*this.elements[13];    
@@ -3690,7 +3685,7 @@ CSG.fuzzyCSGFactory.prototype = {
   },
   
   getVertex: function(sourcevertex) {
-    var elements = [sourcevertex.pos.x, sourcevertex.pos.y, sourcevertex.pos.z]; 
+    var elements = [sourcevertex.pos._x, sourcevertex.pos._y, sourcevertex.pos._z]; 
     var result = this.vertexfactory.lookupOrCreate(elements, function(els) {
       return sourcevertex;
     });
@@ -3698,7 +3693,7 @@ CSG.fuzzyCSGFactory.prototype = {
   },
   
   getPlane: function(sourceplane) {
-    var elements = [sourceplane.normal.x, sourceplane.normal.y, sourceplane.normal.z, sourceplane.w]; 
+    var elements = [sourceplane.normal._x, sourceplane.normal._y, sourceplane.normal._z, sourceplane.w]; 
     var result = this.planefactory.lookupOrCreate(elements, function(els) {
       return sourceplane;
     });
