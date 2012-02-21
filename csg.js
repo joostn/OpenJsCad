@@ -513,17 +513,13 @@ CSG.prototype = {
         var bounds = polygon.boundingBox();
         if(i == 0)
         {
-          minpoint = bounds[0].clone();
-          maxpoint = bounds[1].clone();
+          minpoint = bounds[0];
+          maxpoint = bounds[1];
         }
         else
         {
-          minpoint.x = Math.min(minpoint.x, bounds[0].x);
-          minpoint.y = Math.min(minpoint.y, bounds[0].y);
-          minpoint.z = Math.min(minpoint.z, bounds[0].z);
-          maxpoint.x = Math.max(maxpoint.x, bounds[1].x);
-          maxpoint.y = Math.max(maxpoint.y, bounds[1].y);
-          maxpoint.z = Math.max(maxpoint.z, bounds[1].z);
+          minpoint = minpoint.min(bounds[0]);
+          maxpoint = maxpoint.max(bounds[1]);
         }
       }
       this.cachedBoundingBox = [minpoint, maxpoint];
@@ -534,6 +530,7 @@ CSG.prototype = {
   // returns true if there is a possibility that the two solids overlap
   // returns false if we can be sure that they do not overlap
   mayOverlap: function(csg) {
+  return true;
     if( (this.polygons.length == 0) || (csg.polygons.length == 0) )
     {
       return false;
@@ -1135,77 +1132,109 @@ CSG.roundedCube = function(options) {
 //     new CSG.Vector3D({ x: 1, y: 2, z: 3 });
 
 CSG.Vector3D = function(x, y, z) {
-  var ok = true;
-  if (arguments.length == 1)
+  var value = []; //new Float64Array(3);
+  if (arguments.length == 3)
   {
-    if(typeof(x) == "object")
+//    this.x = Number(x);
+//    this.y = Number(y);
+//    this.z = Number(z);
+    value[0] = x;
+    value[1] = y;
+    value[2] = z;
+  }
+  else
+  {
+    var ok = true;
+    if (arguments.length == 1)
     {
-      if(x instanceof Array)
+      if(typeof(x) == "object")
       {
-        this.x = x[0];
-        this.y = x[1];
-        this.z = x[2];
-      }  
-      else if( ('x' in x) && ('y' in x) && ('z' in x) )
-      {
-        this.x = x.x;
-        this.y = x.y;
-        this.z = x.z;
+        if(x instanceof CSG.Vector3D)
+        {
+          value = x.value;
+        }
+        else if(x instanceof Array)
+        {
+          value[0] = x[0];
+          value[1] = x[1];
+          value[2] = x[2];
+        }  
+        else if( ('x' in x) && ('y' in x) && ('z' in x) )
+        {
+          value[0] = x.x;
+          value[1] = x.y;
+          value[2] = x.z;
+        }
+        else ok = false;
       }
-      else ok = false;
+      else
+      {
+        var v = Number(x);
+        value[0] = v;
+        value[1] = v;
+        value[2] = v;
+      }
     }
-    else
+    else ok = false;
+    if(!ok)
     {
-      var v = Number(x);
-      this.x = v;
-      this.y = v;
-      this.z = v;
+      throw new Error("wrong arguments");
     }
   }
-  else if (arguments.length == 3)
-  {
-    this.x = Number(x);
-    this.y = Number(y);
-    this.z = Number(z);
-  }
-  else ok = false;
-  if(!ok)
-  {
-    throw new Error("wrong arguments");
-  }
+  this.value = value;
 };
 
 CSG.Vector3D.prototype = {
+  get x() {
+    return this.value[0];
+  },
+  get y() {
+    return this.value[1];
+  },
+  get z() {
+    return this.value[2];
+  },
+  
+  set x(v) {
+    throw new Error("Vector3D is immutable");
+  },
+  set y(v) {
+    throw new Error("Vector3D is immutable");
+  },
+  set z(v) {
+    throw new Error("Vector3D is immutable");
+  },
+  
   clone: function() {
-    return new CSG.Vector3D(this.x, this.y, this.z);
+    return new CSG.Vector3D(this);
   },
 
   negated: function() {
-    return new CSG.Vector3D(-this.x, -this.y, -this.z);
+    return new CSG.Vector3D(-this.value[0], -this.value[1], -this.value[2]);
   },
 
   abs: function() {
-    return new CSG.Vector3D(Math.abs(this.x), Math.abs(this.y), Math.abs(this.z));
+    return new CSG.Vector3D(Math.abs(this.value[0]), Math.abs(this.value[1]), Math.abs(this.value[2]));
   },
 
   plus: function(a) {
-    return new CSG.Vector3D(this.x + a.x, this.y + a.y, this.z + a.z);
+    return new CSG.Vector3D(this.value[0] + a.value[0], this.value[1] + a.value[1], this.value[2] + a.value[2]);
   },
 
   minus: function(a) {
-    return new CSG.Vector3D(this.x - a.x, this.y - a.y, this.z - a.z);
+    return new CSG.Vector3D(this.value[0] - a.value[0], this.value[1] - a.value[1], this.value[2] - a.value[2]);
   },
 
   times: function(a) {
-    return new CSG.Vector3D(this.x * a, this.y * a, this.z * a);
+    return new CSG.Vector3D(this.value[0] * a, this.value[1] * a, this.value[2] * a);
   },
 
   dividedBy: function(a) {
-    return new CSG.Vector3D(this.x / a, this.y / a, this.z / a);
+    return new CSG.Vector3D(this.value[0] / a, this.value[1] / a, this.value[2] / a);
   },
 
   dot: function(a) {
-    return this.x * a.x + this.y * a.y + this.z * a.z;
+    return this.value[0] * a.value[0] + this.value[1] * a.value[1] + this.value[2] * a.value[2];
   },
 
   lerp: function(a, t) {
@@ -1226,9 +1255,9 @@ CSG.Vector3D.prototype = {
 
   cross: function(a) {
     return new CSG.Vector3D(
-      this.y * a.z - this.z * a.y,
-      this.z * a.x - this.x * a.z,
-      this.x * a.y - this.y * a.x
+      this.value[1] * a.value[2] - this.value[2] * a.value[1],
+      this.value[2] * a.value[0] - this.value[0] * a.value[2],
+      this.value[0] * a.value[1] - this.value[1] * a.value[0]
     );
   },
   
@@ -1241,7 +1270,7 @@ CSG.Vector3D.prototype = {
   },
 
   equals: function(a) {
-    return (this.x == a.x) && (this.y == a.y) && (this.z == a.z);
+    return (this.value[0] == a.value[0]) && (this.value[1] == a.value[1]) && (this.value[2] == a.value[2]);
   },
   
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
@@ -1255,21 +1284,21 @@ CSG.Vector3D.prototype = {
   },
   
   toStlString: function() {
-    return this.x+" "+this.y+" "+this.z;
+    return this.value[0]+" "+this.value[1]+" "+this.value[2];
   },
   
   toString: function() {
-    return "("+this.x+", "+this.y+", "+this.z+")";
+    return "("+this.value[0]+", "+this.value[1]+", "+this.value[2]+")";
   },
   
   // find a vector that is somewhat perpendicular to this one
   randomNonParallelVector: function() {
     var abs = this.abs();
-    if( (abs.x <= abs.y) && (abs.x <= abs.z) )
+    if( (abs.value[0] <= abs.value[1]) && (abs.value[0] <= abs.value[2]) )
     {
       return new CSG.Vector3D(1,0,0);
     }
-    else if( (abs.y <= abs.x) && (abs.y <= abs.z) )
+    else if( (abs.value[1] <= abs.value[0]) && (abs.value[1] <= abs.value[2]) )
     {
       return new CSG.Vector3D(0,1,0);
     }
@@ -1279,6 +1308,21 @@ CSG.Vector3D.prototype = {
     }
   },
   
+  min: function(p) {
+    return new CSG.Vector3D(
+      Math.min(this.value[0], p.value[0]),
+      Math.min(this.value[1], p.value[1]),
+      Math.min(this.value[2], p.value[2])
+    );
+  },
+  
+  max: function(p) {
+    return new CSG.Vector3D(
+      Math.max(this.value[0], p.value[0]),
+      Math.max(this.value[1], p.value[1]),
+      Math.max(this.value[2], p.value[2])
+    );
+  },
 };
 
 // # class Vertex
@@ -1743,22 +1787,17 @@ CSG.Polygon.prototype = {
       if(numvertices == 0)
       {
         minpoint=new CSG.Vector3D(0,0,0);
-        maxpoint=new CSG.Vector3D(0,0,0);
       }
       else
       {
-        minpoint=vertices[0].pos.clone();
-        maxpoint=vertices[0].pos.clone();
+        minpoint=vertices[0].pos;
       }
+      maxpoint=minpoint;
       for(var i=1; i < numvertices; i++)
       {
         var point = vertices[i].pos;
-        minpoint.x = Math.min(minpoint.x, point.x);
-        minpoint.y = Math.min(minpoint.y, point.y);
-        minpoint.z = Math.min(minpoint.z, point.z);
-        maxpoint.x = Math.max(maxpoint.x, point.x);
-        maxpoint.y = Math.max(maxpoint.y, point.y);
-        maxpoint.z = Math.max(maxpoint.z, point.z);
+        minpoint = minpoint.min(point);
+        maxpoint = maxpoint.max(point);
       }
       this.cachedBoundingBox = [minpoint, maxpoint];
     }
@@ -2029,10 +2068,10 @@ CSG.PolygonTreeNode.prototype = {
       {
         var bound = polygon.boundingSphere();
         var sphereradius = bound[1] + 1e-4;
-//        var d = plane.normal.dot(bound[0]) - plane.w;
         var planenormal = plane.normal;
         var spherecenter = bound[0];
-        var d = planenormal.x*spherecenter.x + planenormal.y*spherecenter.y + planenormal.z*spherecenter.z - plane.w; 
+        var d = planenormal.dot(spherecenter) - plane.w;
+//        var d = planenormal.x*spherecenter.x + planenormal.y*spherecenter.y + planenormal.z*spherecenter.z - plane.w; 
         if(d > sphereradius)
         {
           frontnodes.push(this);
