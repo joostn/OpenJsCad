@@ -412,11 +412,19 @@ CSG.prototype = {
   // resolution: number of points per 360 degree for the rounded corners
   expand: function(radius, resolution) {
     var result=this;
+    var count = 0;
     this.polygons.map(function(p) {
       var expanded=p.expand(radius, resolution);
-      result=result.unionSub(expanded, true, false);
+      result=result.unionSub(expanded, false, false);
+      count++;
+      if(count == 30)
+      {
+        result = result.reTesselated();
+        count = 0;
+      }
     });
-    result = result.canonicalized();
+//    result = result.canonicalized();
+    result = result.reTesselated();
     result.properties = this.properties;  // keep original properties
     return result;
   },
