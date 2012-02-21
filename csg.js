@@ -91,12 +91,16 @@ for solid CAD anyway.
 CSG = function() {
   this.polygons = [];
   this.properties = new CSG.Properties();
+  this.isCanonicalized = true;
+  this.isRetesselated = true;
 };
 
 // Construct a CSG solid from a list of `CSG.Polygon` instances.
 CSG.fromPolygons = function(polygons) {
   var csg = new CSG();
   csg.polygons = polygons;
+  csg.isCanonicalized = false;
+  csg.isRetesselated = false;
   return csg;
 };
 
@@ -107,6 +111,67 @@ CSG.fromObject = function(obj) {
   });
   var csg = CSG.fromPolygons(polygons);
   csg = csg.canonicalized();
+  return csg;
+};
+
+// Reconstruct a CSG from the output of toCompactBinary()
+CSG.fromCompactBinary = function(bin) {
+  var planes = [];
+  var planeData = bin.planeData;
+  var numplanes = planeData.length / 4;
+  var arrayindex = 0;
+  for(var planeindex = 0; planeindex < numplanes; planeindex++)
+  {
+    var x = planeData[arrayindex++];
+    var y = planeData[arrayindex++];
+    var z = planeData[arrayindex++];
+    var w = planeData[arrayindex++];
+    var normal = new CSG.Vector3D(x,y,z);
+    var plane = new CSG.Plane(normal, w);
+    planes.push(plane);
+  }
+
+  var vertices = [];
+  var vertexData = bin.vertexData;
+  var numvertices = vertexData.length / 3;
+  arrayindex = 0;
+  for(var vertexindex = 0; vertexindex < numvertices; vertexindex++)
+  {
+    var x = vertexData[arrayindex++];
+    var y = vertexData[arrayindex++];
+    var z = vertexData[arrayindex++];
+    var pos = new CSG.Vector3D(x,y,z);
+    var vertex = new CSG.Vertex(pos);
+    vertices.push(vertex);
+  }
+
+  var shareds = bin.shared.map(function(shared){
+    return CSG.Polygon.Shared.fromObject(shared); 
+  });
+
+  var polygons = [];
+  var numpolygons = bin.numPolygons;
+  var numVerticesPerPolygon = bin.numVerticesPerPolygon;
+  var polygonVertices = bin.polygonVertices;
+  var polygonPlaneIndexes = bin.polygonPlaneIndexes;
+  var polygonSharedIndexes = bin.polygonSharedIndexes;
+  arrayindex = 0;
+  for(var polygonindex = 0; polygonindex < numpolygons; polygonindex++)
+  {
+    var numpolygonvertices = numVerticesPerPolygon[polygonindex];
+    var polygonvertices = [];
+    for(var i = 0; i < numpolygonvertices; i++)
+    {
+      polygonvertices.push(vertices[polygonVertices[arrayindex++]]);
+    }
+    var plane = planes[polygonPlaneIndexes[polygonindex]];
+    var shared = shareds[polygonSharedIndexes[polygonindex]];
+    var polygon = new CSG.Polygon(polygonvertices, shared, plane);
+    polygons.push(polygon);
+  }
+  var csg = CSG.fromPolygons(polygons);
+  csg.isCanonicalized = true;
+  csg.isRetesselated = true;
   return csg;
 };
 
@@ -134,16 +199,23 @@ CSG.prototype = {
   },
   
   unionSub: function(csg, retesselate, canonicalize) {
-    var a = new CSG.Tree(this.polygons);
-    var b = new CSG.Tree(csg.polygons);
-    a.clipTo(b, false);
-    b.clipTo(a, true);    
-    var newpolygons = a.allPolygons().concat(b.allPolygons());
-    var result = CSG.fromPolygons(newpolygons);
-    result.properties = this.properties._merge(csg.properties);
-    if(canonicalize) result = result.canonicalized();
-    if(retesselate) result = result.reTesselated();              
-    return result;
+    if(! this.mayOverlap(csg))
+    {
+      return this.unionForNonIntersecting(csg);
+    }
+    else
+    {
+      var a = new CSG.Tree(this.polygons);
+      var b = new CSG.Tree(csg.polygons);
+      a.clipTo(b, false);
+      b.clipTo(a, true);    
+      var newpolygons = a.allPolygons().concat(b.allPolygons());
+      var result = CSG.fromPolygons(newpolygons);
+      result.properties = this.properties._merge(csg.properties);
+      if(canonicalize) result = result.canonicalized();
+      if(retesselate) result = result.reTesselated();              
+      return result;
+    }
   },
 
   // Like union, but when we know that the two solids are not intersecting
@@ -152,6 +224,8 @@ CSG.prototype = {
     var newpolygons = this.polygons.concat(csg.polygons);
     var result = CSG.fromPolygons(newpolygons);
     result.properties = this.properties._merge(csg.properties);
+    result.isCanonicalized = this.isCanonicalized && csg.isCanonicalized;
+    result.isRetesselated = this.isRetesselated && csg.isRetesselated;
     return result;
   },
 
@@ -232,11 +306,53 @@ CSG.prototype = {
   },
   
   // Affine transformation of CSG object. Returns a new CSG object
-  transform: function(matrix4x4) {
+  transform1: function(matrix4x4) {
     var newpolygons = this.polygons.map(function(p) { return p.transform(matrix4x4); } );
     var result=CSG.fromPolygons(newpolygons); 
     result.properties = this.properties._transform(matrix4x4);
     result.isRetesselated = this.isRetesselated;
+    return result; 
+  },
+
+  transform: function(matrix4x4) {
+    var scalefactor = matrix4x4.elements[0] * matrix4x4.elements[5] * matrix4x4.elements[10];
+    var ismirror = (scalefactor < 0);
+    var transformedvertices = {};
+    var transformedplanes = {};
+    var newpolygons = this.polygons.map(function(p) {
+      var newplane;      
+      var plane = p.plane;
+      var planetag = plane.getTag();
+      if(planetag in transformedplanes)
+      {
+        newplane = transformedplanes[planetag];
+      }
+      else
+      {
+        newplane = plane.transform(matrix4x4);
+        transformedplanes[planetag] = newplane;
+      }
+      var newvertices = p.vertices.map(function(v) {
+        var newvertex;
+        var vertextag = v.getTag();
+        if(vertextag in transformedvertices)
+        {
+          newvertex = transformedvertices[vertextag];
+        }
+        else
+        {
+          newvertex = v.transform(matrix4x4);
+          transformedvertices[vertextag] = newvertex;
+        }
+        return newvertex;
+      });
+      if(ismirror) newvertices.reverse();
+      return new CSG.Polygon(newvertices, p.shared, newplane); 
+    });
+    var result=CSG.fromPolygons(newpolygons); 
+    result.properties = this.properties._transform(matrix4x4);
+    result.isRetesselated = this.isRetesselated;
+    result.isCanonicalized = this.isCanonicalized;
     return result; 
   },
 
@@ -344,9 +460,8 @@ CSG.prototype = {
       var polygonsPerPlane = {};
       csg.polygons.map(function(polygon) {
         var planetag = polygon.plane.getTag();
-        var sharedtag = null;
-        if(polygon.shared !== undefined) sharedtag = polygon.shared;
-        planetag += "/"+JSON.stringify(sharedtag);
+        var sharedtag = polygon.shared.getTag();
+        planetag += "/"+sharedtag;
         if(! (planetag in polygonsPerPlane) )
         {
           polygonsPerPlane[planetag] = [];
@@ -406,6 +521,27 @@ CSG.prototype = {
       this.cachedBoundingBox = [minpoint, maxpoint];
     }
     return this.cachedBoundingBox;
+  },
+  
+  // returns true if there is a possibility that the two solids overlap
+  // returns false if we can be sure that they do not overlap
+  mayOverlap: function(csg) {
+    if( (this.polygons.length == 0) || (csg.polygons.length == 0) )
+    {
+      return false;
+    }
+    else
+    {
+      var mybounds = this.getBounds();
+      var otherbounds = csg.getBounds();
+      if(mybounds[1].x < otherbounds[0].x) return false;
+      if(mybounds[0].x > otherbounds[1].x) return false;
+      if(mybounds[1].y < otherbounds[0].y) return false;
+      if(mybounds[0].y > otherbounds[1].y) return false;
+      if(mybounds[1].z < otherbounds[0].z) return false;
+      if(mybounds[0].z > otherbounds[1].z) return false;
+      return true;
+    } 
   },
   
   // Cut the solid by a plane. Returns the solid on the back side of the plane
@@ -471,12 +607,99 @@ CSG.prototype = {
   }, 
 
   setColor: function(red,green,blue) {
-    var newshared = {
-      color: [red, green, blue],
-    };
+    var newshared = new CSG.Polygon.Shared([red, green, blue]); 
     return this.setShared(newshared);
   },
-    
+
+  toCompactBinary: function() {
+    var csg = this.canonicalized();
+    var numpolygons = csg.polygons.length;
+    var numpolygonvertices = 0;
+    var numvertices = 0;
+    var vertexmap = {};
+    var vertices = [];
+    var numplanes = 0;
+    var planemap = {};
+    var polygonindex = 0;
+    var planes = [];
+    var shareds = [];
+    var sharedmap = {};
+    var numshared = 0;
+    csg.polygons.map(function(p){
+      p.vertices.map(function(v){
+        ++numpolygonvertices;
+        var vertextag = v.getTag();
+        if(! (vertextag in vertexmap))
+        { 
+          vertexmap[vertextag] = numvertices++;
+          vertices.push(v);
+        }
+      });
+      var planetag = p.plane.getTag();
+      if(! (planetag in planemap))
+      { 
+        planemap[planetag] = numplanes++;
+        planes.push(p.plane);
+      }
+      var sharedtag = p.shared.getTag();
+      if(! (sharedtag in sharedmap))
+      { 
+        sharedmap[sharedtag] = numshared++;
+        shareds.push(p.shared);
+      }      
+    });
+    var numVerticesPerPolygon = new Uint32Array(numpolygons);
+    var polygonSharedIndexes = new Uint32Array(numpolygons);
+    var polygonVertices = new Uint32Array(numpolygonvertices);
+    var polygonPlaneIndexes = new Uint32Array(numpolygons);
+    var vertexData = new Float64Array(numvertices * 3);
+    var planeData = new Float64Array(numplanes * 4);
+    var polygonVerticesIndex = 0;
+    for(var polygonindex = 0; polygonindex < numpolygons; ++polygonindex)
+    {
+      var p = csg.polygons[polygonindex];   
+      numVerticesPerPolygon[polygonindex] = p.vertices.length;
+      p.vertices.map(function(v){
+        var vertextag = v.getTag();
+        var vertexindex = vertexmap[vertextag];
+        polygonVertices[polygonVerticesIndex++] = vertexindex;
+      });
+      var planetag = p.plane.getTag();
+      var planeindex = planemap[planetag];
+      polygonPlaneIndexes[polygonindex] = planeindex;
+      var sharedtag = p.shared.getTag();
+      var sharedindex = sharedmap[sharedtag];
+      polygonSharedIndexes[polygonindex] = sharedindex;
+    }
+    var verticesArrayIndex = 0;
+    vertices.map(function(v){
+      var pos = v.pos;
+      vertexData[verticesArrayIndex++] = pos.x; 
+      vertexData[verticesArrayIndex++] = pos.y; 
+      vertexData[verticesArrayIndex++] = pos.z; 
+    });
+    var planesArrayIndex = 0;
+    planes.map(function(p){
+      var normal = p.normal;
+      planeData[planesArrayIndex++] = normal.x; 
+      planeData[planesArrayIndex++] = normal.y; 
+      planeData[planesArrayIndex++] = normal.z;
+      planeData[planesArrayIndex++] = p.w;
+    });
+    var result = {
+      numPolygons: numpolygons,
+      numVerticesPerPolygon: numVerticesPerPolygon,
+      polygonPlaneIndexes: polygonPlaneIndexes,
+      polygonSharedIndexes: polygonSharedIndexes,
+      polygonVertices: polygonVertices, 
+      vertexData: vertexData,
+      planeData: planeData,
+      shared: shareds,
+    };
+    return result;
+  },
+
+
 };
 
 // Parse an option from the options object
@@ -1230,136 +1453,116 @@ CSG.Plane.prototype = {
     {
       var EPS = CSG.Plane.EPSILON;
       var thisw = this.w;
-      // first check if the polygon's bounding sphere is completely in front or in back:
-      var bound = polygon.boundingSphere();
-      var spherecenter = bound[0];
-      var sphereradius = bound[1];
-      sphereradius += EPS;
-      //var d = this.signedDistanceToPoint(spherecenter);
-      var d = planenormal.dot(spherecenter) - thisw;
-     
-      if(d > sphereradius)
+      var hasfront = false;
+      var hasback = false;
+      var vertexIsBack = [];
+      var MINEPS = -EPS;
+      for (var i = 0; i < numvertices; i++) {
+        var t = planenormal.dot(vertices[i].pos) - thisw;
+        var isback = (t < 0);
+        vertexIsBack.push(isback);
+        if(t > EPS) hasfront = true; 
+        if(t < MINEPS) hasback = true; 
+      }
+      if( (!hasfront) && (!hasback) )
+      {
+        // all points coplanar
+        var t = planenormal.dot(polygon.plane.normal);
+        result.type = (t >= 0)? 0:1;
+      }
+      else if(!hasback)
       {
         result.type = 2;
       }
-      else if(d < -sphereradius)
+      else if(!hasfront)
       {
         result.type = 3;
       }
       else
       {
-        // no, we really have to check each vertex separately:         
-        var hasfront = false;
-        var hasback = false;
-        var vertexIsBack = [];
-        var MINEPS = -EPS;
-        for (var i = 0; i < numvertices; i++) {
-          var t = planenormal.dot(vertices[i].pos) - thisw;
-          var isback = (t < 0);
-          vertexIsBack.push(isback);
-          if(t > EPS) hasfront = true; 
-          if(t < MINEPS) hasback = true; 
-        }
-        if( (!hasfront) && (!hasback) )
+        // spanning
+        result.type = 4;
+        var frontvertices = [], backvertices = [];
+        var isback = vertexIsBack[0];
+        for(var vertexindex = 0; vertexindex < numvertices; vertexindex++)
         {
-          // all points coplanar
-          var t = planenormal.dot(polygon.plane.normal);
-          result.type = (t >= 0)? 0:1;
-        }
-        else if(!hasback)
-        {
-          result.type = 2;
-        }
-        else if(!hasfront)
-        {
-          result.type = 3;
-        }
-        else
-        {
-          // spanning
-          result.type = 4;
-          var frontvertices = [], backvertices = [];
-          var isback = vertexIsBack[0];
-          for(var vertexindex = 0; vertexindex < numvertices; vertexindex++)
+          var vertex = vertices[vertexindex];
+          var nextvertexindex = vertexindex + 1;
+          if(nextvertexindex >= numvertices) nextvertexindex = 0;
+          var nextisback = vertexIsBack[nextvertexindex];
+          if(isback == nextisback)
           {
-            var vertex = vertices[vertexindex];
-            var nextvertexindex = vertexindex + 1;
-            if(nextvertexindex >= numvertices) nextvertexindex = 0;
-            var nextisback = vertexIsBack[nextvertexindex];
-            if(isback == nextisback)
+            // line segment is on one side of the plane:
+            if(isback)
             {
-              // line segment is on one side of the plane:
-              if(isback)
-              {
-                backvertices.push(vertex);
-              }
-              else
-              {
-                frontvertices.push(vertex);
-              }          
+              backvertices.push(vertex);
             }
             else
             {
-              // line segment intersects plane:
-              var point = vertex.pos;
-              var nextpoint = vertices[nextvertexindex].pos;
-              var line = CSG.Line3D.fromPoints(point, nextpoint);
-              var intersectionpoint =  this.intersectWithLine(line);
-              var intersectionvertex = new CSG.Vertex(intersectionpoint);
-              if(isback)
-              {
-                backvertices.push(vertex);
-                backvertices.push(intersectionvertex);
-                frontvertices.push(intersectionvertex);
-              }
-              else
-              {
-                frontvertices.push(vertex);
-                frontvertices.push(intersectionvertex);
-                backvertices.push(intersectionvertex);
-              }          
+              frontvertices.push(vertex);
+            }          
+          }
+          else
+          {
+            // line segment intersects plane:
+            var point = vertex.pos;
+            var nextpoint = vertices[nextvertexindex].pos;
+            var line = CSG.Line3D.fromPoints(point, nextpoint);
+            var intersectionpoint =  this.intersectWithLine(line);
+            var intersectionvertex = new CSG.Vertex(intersectionpoint);
+            if(isback)
+            {
+              backvertices.push(vertex);
+              backvertices.push(intersectionvertex);
+              frontvertices.push(intersectionvertex);
             }
-            isback = nextisback;
-          }  // for vertexindex
-  
-          // remove duplicate vertices:
-          var EPS_SQUARED = CSG.Plane.EPSILON * CSG.Plane.EPSILON;  
-          if(backvertices.length >= 3)
-          {
-            var prevvertex = backvertices[backvertices.length - 1];
-            for(var vertexindex = 0; vertexindex < backvertices.length; vertexindex++)
+            else
             {
-              var vertex = backvertices[vertexindex];
-              if(vertex.pos.distanceToSquared(prevvertex.pos) < EPS_SQUARED)
-              {
-                backvertices.splice(vertexindex,1);
-                vertexindex--;
-              }
-              prevvertex = vertex;
-            }        
+              frontvertices.push(vertex);
+              frontvertices.push(intersectionvertex);
+              backvertices.push(intersectionvertex);
+            }          
           }
-          if(frontvertices.length >= 3)
+          isback = nextisback;
+        }  // for vertexindex
+
+        // remove duplicate vertices:
+        var EPS_SQUARED = CSG.Plane.EPSILON * CSG.Plane.EPSILON;  
+        if(backvertices.length >= 3)
+        {
+          var prevvertex = backvertices[backvertices.length - 1];
+          for(var vertexindex = 0; vertexindex < backvertices.length; vertexindex++)
           {
-            var prevvertex = frontvertices[frontvertices.length - 1];
-            for(var vertexindex = 0; vertexindex < frontvertices.length; vertexindex++)
+            var vertex = backvertices[vertexindex];
+            if(vertex.pos.distanceToSquared(prevvertex.pos) < EPS_SQUARED)
             {
-              var vertex = frontvertices[vertexindex];
-              if(vertex.pos.distanceToSquared(prevvertex.pos) < EPS_SQUARED)
-              {
-                frontvertices.splice(vertexindex,1);
-                vertexindex--;
-              }
-              prevvertex = vertex;
-            }        
-          }
-          if (frontvertices.length >= 3)
+              backvertices.splice(vertexindex,1);
+              vertexindex--;
+            }
+            prevvertex = vertex;
+          }        
+        }
+        if(frontvertices.length >= 3)
+        {
+          var prevvertex = frontvertices[frontvertices.length - 1];
+          for(var vertexindex = 0; vertexindex < frontvertices.length; vertexindex++)
           {
-            result.front = new CSG.Polygon(frontvertices, polygon.shared, polygon.plane); 
-          }
-          if (backvertices.length >= 3)
-          {
-            result.back = new CSG.Polygon(backvertices, polygon.shared, polygon.plane); 
-          }
+            var vertex = frontvertices[vertexindex];
+            if(vertex.pos.distanceToSquared(prevvertex.pos) < EPS_SQUARED)
+            {
+              frontvertices.splice(vertexindex,1);
+              vertexindex--;
+            }
+            prevvertex = vertex;
+          }        
+        }
+        if (frontvertices.length >= 3)
+        {
+          result.front = new CSG.Polygon(frontvertices, polygon.shared, polygon.plane); 
+        }
+        if (backvertices.length >= 3)
+        {
+          result.back = new CSG.Polygon(backvertices, polygon.shared, polygon.plane); 
         }
       }
     }
@@ -1409,6 +1612,7 @@ CSG.Plane.prototype = {
 // passed as the third argument 
 CSG.Polygon = function(vertices, shared, plane) {
   this.vertices = vertices;
+  if(!shared) shared = CSG.Polygon.defaultShared;
   this.shared = shared;
   var numvertices = vertices.length;
 
@@ -1432,7 +1636,7 @@ CSG.Polygon.fromObject = function(obj) {
   var vertices = obj.vertices.map(function(v) {
     return CSG.Vertex.fromObject(v);
   });
-  var shared = obj.shared;
+  var shared = CSG.Polygon.Shared.fromObject(obj.shared);
   var plane = CSG.Plane.fromObject(obj.plane);
   return new CSG.Polygon(vertices, shared, plane);
 };
@@ -1667,6 +1871,37 @@ CSG.Polygon.isStrictlyConvexPoint = function(prevpoint, point, nextpoint, normal
   return (crossdotnormal >= 1e-5);
 };
 
+// # class CSG.Polygon.Shared
+
+// Holds the shared properties for each polygon (currently only color)
+
+CSG.Polygon.Shared = function(color) {
+  this.color = color;
+};
+
+CSG.Polygon.Shared.fromObject = function(obj) {
+  return new CSG.Polygon.Shared(obj.color);
+};
+
+CSG.Polygon.Shared.prototype = {
+  getTag: function() {
+    var result = this.tag;
+    if(!result)
+    {
+      result = CSG.getTag();
+      this.tag = result;
+    }
+    return result;
+  },
+  // get a string uniquely identifying this object
+  getHash: function() {
+    if(!this.color) return "null";
+    return ""+this.color[0]+"/"+this.color[1]+"/"+this.color[2];
+  },
+};
+
+CSG.Polygon.defaultShared = new CSG.Polygon.Shared(null);
+
 // # class PolygonTreeNode
 
 // This class manages hierarchical splits of polygons
@@ -1781,39 +2016,57 @@ CSG.PolygonTreeNode.prototype = {
     else
     {
       // no children. Split the polygon:
-      if(this.polygon)
+      var polygon = this.polygon;
+      if(polygon)
       {
-        var splitresult = plane.splitPolygon(this.polygon);
-        switch(splitresult.type)
+        var bound = polygon.boundingSphere();
+        var sphereradius = bound[1] + 1e-4;
+//        var d = plane.normal.dot(bound[0]) - plane.w;
+        var planenormal = plane.normal;
+        var spherecenter = bound[0];
+        var d = planenormal.x*spherecenter.x + planenormal.y*spherecenter.y + planenormal.z*spherecenter.z - plane.w; 
+        if(d > sphereradius)
         {
-          case 0:   // coplanar front:
-            coplanarfrontnodes.push(this);
-            break;
-            
-          case 1:   // coplanar back:
-            coplanarbacknodes.push(this);
-            break;
-            
-          case 2:   // front:
-            frontnodes.push(this);
-            break;
-            
-          case 3:   // back:
-            backnodes.push(this);
-            break;
-            
-          case 4:  // spanning:
-            if(splitresult.front)
-            {
-              var frontnode = this.addChild(splitresult.front);
-              frontnodes.push(frontnode);
-            }
-            if(splitresult.back)
-            {
-              var backnode = this.addChild(splitresult.back);
-              backnodes.push(backnode);
-            }
-            break;
+          frontnodes.push(this);
+        }
+        else if(d < -sphereradius)
+        {
+          backnodes.push(this);
+        }
+        else
+        {
+          var splitresult = plane.splitPolygon(polygon);
+          switch(splitresult.type)
+          {
+            case 0:   // coplanar front:
+              coplanarfrontnodes.push(this);
+              break;
+              
+            case 1:   // coplanar back:
+              coplanarbacknodes.push(this);
+              break;
+              
+            case 2:   // front:
+              frontnodes.push(this);
+              break;
+              
+            case 3:   // back:
+              backnodes.push(this);
+              break;
+              
+            case 4:  // spanning:
+              if(splitresult.front)
+              {
+                var frontnode = this.addChild(splitresult.front);
+                frontnodes.push(frontnode);
+              }
+              if(splitresult.back)
+              {
+                var backnode = this.addChild(splitresult.back);
+                backnodes.push(backnode);
+              }
+              break;
+          }
         }
       }      
     }
@@ -3338,9 +3591,23 @@ CSG.fuzzyFactory.joinSets = function(set1, set2) {
 CSG.fuzzyCSGFactory = function() {
   this.vertexfactory = new CSG.fuzzyFactory(3, 1e-5);
   this.planefactory = new CSG.fuzzyFactory(4, 1e-5);
+  this.polygonsharedfactory = {};
 };
 
 CSG.fuzzyCSGFactory.prototype = {
+  getPolygonShared: function(sourceshared) {
+    var hash = sourceshared.getHash();
+    if(hash in this.polygonsharedfactory)
+    {
+      return this.polygonsharedfactory[hash];
+    }
+    else
+    {
+      this.polygonsharedfactory[hash] = sourceshared;
+      return sourceshared;
+    }
+  },
+  
   getVertex: function(sourcevertex) {
     var elements = [sourcevertex.pos.x, sourcevertex.pos.y, sourcevertex.pos.z]; 
     var result = this.vertexfactory.lookupOrCreate(elements, function(els) {
@@ -3359,11 +3626,12 @@ CSG.fuzzyCSGFactory.prototype = {
 
   getPolygon: function(sourcepolygon) {
     var newplane = this.getPlane(sourcepolygon.plane);
+    var newshared = this.getPolygonShared(sourcepolygon.shared);
     var _this = this;
     var newvertices = sourcepolygon.vertices.map(function(vertex) {
       return _this.getVertex(vertex);
     });
-    return new CSG.Polygon(newvertices, sourcepolygon.shared, newplane);    
+    return new CSG.Polygon(newvertices, newshared, newplane);    
   },
 
   getCSG: function(sourcecsg) {

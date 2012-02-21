@@ -1,6 +1,25 @@
 OpenJsCad = function() {
 };
 
+OpenJsCad.log = function(txt) {
+  var timeInMs = Date.now();
+  var prevtime = OpenJsCad.log.prevLogTime;
+  if(!prevtime) prevtime = timeInMs;
+  var deltatime = timeInMs - prevtime;
+  OpenJsCad.log.prevLogTime = timeInMs;
+  var timefmt = (deltatime*0.001).toFixed(3);
+  txt = "["+timefmt+"] "+txt;
+  if( (typeof(console) == "object") && (typeof(console.log) == "function") )
+  {
+    console.log(txt);
+  }
+  else if( (typeof(self) == "object") && (typeof(self.postMessage) == "function") )
+  {
+    self.postMessage({cmd: 'log', txt: txt});
+  }
+  else throw new Error("Cannot log");
+};
+
 // A viewer is a WebGL canvas that lets the user view a mesh. The user can
 // tumble it around by dragging the mouse.
 OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
@@ -243,13 +262,16 @@ OpenJsCad.runMainInWorker = function(mainParameters)
 {
   try
   {
-    if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid.');    
+    if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid.');
+    OpenJsCad.log.prevLogTime = Date.now();    
     var csg = main(mainParameters);
     if( (typeof(csg) != "object") || (!(csg instanceof CSG)) )
     {
       throw new Error("Your main() function should return a CSG solid.");
     }
-    self.postMessage({cmd: 'rendered', csg: csg});
+    var csg_bin = csg.toCompactBinary();
+    csg = null; // not needed anymore
+    self.postMessage({cmd: 'rendered', csg: csg_bin});
   }
   catch(e)
   {
@@ -278,6 +300,7 @@ OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
   }
   workerscript += "return main("+JSON.stringify(mainParameters)+");";  
   var f = new Function(workerscript);
+  OpenJsCad.log.prevLogTime = Date.now();    
   var csg = f();
   return csg;
 };
@@ -314,13 +337,18 @@ OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, callback) {
     { 
       if(e.data.cmd == 'rendered')
       {
-        var csg = CSG.fromObject(e.data.csg);
+        //var csg = CSG.fromObject(e.data.csg);
+        var csg = CSG.fromCompactBinary(e.data.csg);
         callback(null, csg);
       }
       else if(e.data.cmd == "error")
       {
 //        var errtxt = "Error in line "+e.data.err.lineno+": "+e.data.err.message;
         callback(e.data.err, null);
+      }
+      else if(e.data.cmd == "log")
+      {
+        console.log(e.data.txt);
       }
     }
   };
@@ -923,6 +951,4 @@ OpenJsCad.Processor.prototype = {
     }); 
     this.paramControls = paramControls;
   },
-  
-
 };
