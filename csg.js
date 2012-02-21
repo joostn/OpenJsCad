@@ -417,7 +417,7 @@ CSG.prototype = {
       var expanded=p.expand(radius, resolution);
       result=result.unionSub(expanded, false, false);
       count++;
-      if(count == 30)
+      if(count == 300)
       {
         result = result.reTesselated();
         count = 0;
@@ -1716,7 +1716,7 @@ CSG.Polygon.prototype = {
     var extrudevector=this.plane.normal.unit().times(2*radius);
     var translatedpolygon = this.translate(extrudevector.times(-0.5));
     var extrudedface = translatedpolygon.extrude(extrudevector);  
-    result=result.unionSub(extrudedface, true, false);
+    result=result.unionSub(extrudedface, false, false);
     return result;
   },
   
@@ -2126,7 +2126,7 @@ CSG.PolygonTreeNode.prototype = {
 // The actual tree is kept in this.rootnode
 CSG.Tree = function(polygons) {
   this.polygonTree = new CSG.PolygonTreeNode();
-  this.rootnode = new CSG.Node();
+  this.rootnode = new CSG.Node(null);
   if (polygons) this.addPolygons(polygons);
 };
 
@@ -2151,15 +2151,11 @@ CSG.Tree.prototype = {
 
   addPolygons: function(polygons) {
     var _this = this;
-    polygons.map(function(p) {
-      _this.addPolygon(p);
+    var polygontreenodes = polygons.map(function(p) {
+      return _this.polygonTree.addChild(p);
     });
+    this.rootnode.addPolygonTreeNodes(polygontreenodes);
   },
-
-  addPolygon: function(polygon) {
-    var polygontreenode=this.polygonTree.addChild(polygon);
-    this.rootnode.addPolygonTreeNode(polygontreenode);
-  },  
 };
 
 // # class Node
@@ -2172,11 +2168,12 @@ CSG.Tree.prototype = {
 // This is not a leafy BSP tree since there is
 // no distinction between internal and leaf nodes.
 
-CSG.Node = function() {
+CSG.Node = function(parent) {
   this.plane = null;
   this.front = null;
   this.back = null;
   this.polygontreenodes = [];
+  this.parent = parent;
 };
 
 CSG.Node.prototype = {
@@ -2239,23 +2236,60 @@ CSG.Node.prototype = {
     if (this.back) this.back.clipTo(tree, alsoRemovecoplanarFront);
   },
   
-  addPolygonTreeNode: function(polygontreenode) {
+  addPolygonTreeNodes: function(polygontreenodes) {
+    if(polygontreenodes.length == 0) return;
+    var _this = this;
     if(!this.plane)
     {
-      this.plane = polygontreenode.getPolygon().plane;
+      var bestplane = polygontreenodes[0].getPolygon().plane;
+/*      
+      var parentnormals = [];
+      this.getParentPlaneNormals(parentnormals, 6);
+//parentnormals = [];      
+      var numparentnormals = parentnormals.length;
+      var minmaxnormal = 1.0;
+      polygontreenodes.map(function(polygontreenode){
+        var plane = polygontreenodes[0].getPolygon().plane;
+        var planenormal = plane.normal;
+        var maxnormaldot = -1.0;
+        parentnormals.map(function(parentnormal){
+          var dot = parentnormal.dot(planenormal);
+          if(dot > maxnormaldot) maxnormaldot = dot;  
+        });
+        if(maxnormaldot < minmaxnormal)
+        {
+          minmaxnormal = maxnormaldot;
+          bestplane = plane;
+        }
+      });
+*/      
+      this.plane = bestplane;      
     }
     var frontnodes = [];
     var backnodes = [];
-    polygontreenode.splitByPlane(this.plane, this.polygontreenodes, this.polygontreenodes, frontnodes, backnodes);
+    polygontreenodes.map(function(polygontreenode){
+      polygontreenode.splitByPlane(_this.plane, _this.polygontreenodes, _this.polygontreenodes, frontnodes, backnodes);
+    });
     if(frontnodes.length > 0)
     {
-      if (!this.front) this.front = new CSG.Node();
-      this.front.addPolygonTreeNode(frontnodes[0]);
+      if (!this.front) this.front = new CSG.Node(this);
+      this.front.addPolygonTreeNodes(frontnodes);
     }
     if(backnodes.length > 0)
     {
-      if (!this.back) this.back = new CSG.Node();
-      this.back.addPolygonTreeNode(backnodes[0]);
+      if (!this.back) this.back = new CSG.Node(this);
+      this.back.addPolygonTreeNodes(backnodes);
+    }
+  },
+  
+  getParentPlaneNormals: function(normals, maxdepth) {
+    if(maxdepth > 0)
+    {
+      if(this.parent)
+      {
+        normals.push(this.parent.plane.normal);
+        this.parent.getParentPlaneNormals(normals,maxdepth-1);
+      }
     }
   },
 };
