@@ -1062,10 +1062,8 @@ CSG.roundedCube = function(options) {
   var resolution = CSG.parseOptionAsFloat(options, "resolution", 8);
   if(resolution < 4) resolution = 4;
   var roundradius = CSG.parseOptionAsFloat(options, "roundradius", 0.2);
-  var innercuberadius=cuberadius.clone();
-  innercuberadius.x -= roundradius;
-  innercuberadius.y -= roundradius;
-  innercuberadius.z -= roundradius;
+  var innercuberadius=cuberadius;
+  innercuberadius = innercuberadius.minus(new CSG.Vector3D(roundradius));
   var result = CSG.cube({center: center, radius: [cuberadius.x, innercuberadius.y, innercuberadius.z]});
   result = result.unionSub( CSG.cube({center: center, radius: [innercuberadius.x, cuberadius.y, innercuberadius.z]}),false,false);
   result = result.unionSub( CSG.cube({center: center, radius: [innercuberadius.x, innercuberadius.y, cuberadius.z]}),false,false);
@@ -2213,7 +2211,7 @@ CSG.Node = function(parent) {
 CSG.Node.prototype = {
   // Convert solid space to empty space and empty space to solid space.
   invert: function() {
-    this.plane = this.plane.flipped();
+    if (this.plane) this.plane = this.plane.flipped();
     if (this.front) this.front.invert();
     if (this.back) this.back.invert();
     var temp = this.front;

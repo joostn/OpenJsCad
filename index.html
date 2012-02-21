@@ -590,7 +590,9 @@ view the source of csg.js:
 var vec1 = new CSG.Vector3D(1,2,3);       // 3 arguments
 var vec2 = new CSG.Vector3D( [1,2,3] );   // 1 array argument
 var vec3 = new CSG.Vector3D(vec2);        // cloning a vector
+// get the values as: vec1.x, vec.y, vec1.z
 // vector math. All operations return a new vector, the original is unmodified!
+// vectors cannot be modified. Instead you should create a new vector.
 vec.negated()
 vec.abs()
 vec.plus(othervector)
@@ -607,6 +609,8 @@ vec.distanceTo(othervector)
 vec.distanceToSquared(othervector)  // == vec.distanceTo(othervector)^2
 vec.equals(othervector)
 vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
+vec.min(othervector)        // returns a new vector with the minimum x,y and z values
+vec.max(othervector)        // returns a new vector with the maximum x,y and z values
 
 // --------- Vector2D ---------------------
 var vec1 = new CSG.Vector2D(1,2);       // 2 arguments
