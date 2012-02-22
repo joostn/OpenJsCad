@@ -653,6 +653,7 @@ var vec2d = m1.leftMultiply1x2Vector(vec2d);   // vector * matrix
 var m = CSG.Matrix4x4.rotationX(degrees);      // matrix for rotation about X axis
 var m = CSG.Matrix4x4.rotationY(degrees);      // matrix for rotation about Y axis
 var m = CSG.Matrix4x4.rotationZ(degrees);      // matrix for rotation about Z axis
+var m = CSG.Matrix4x4.rotation(rotationCenter, rotationAxis, degrees); // rotation about arbitrary point and axis
 var m = CSG.Matrix4x4.translation(vec3d);      // translation
 var m = CSG.Matrix4x4.scaling(vec3d);          // scale
 var m = CSG.Matrix4x4.mirroring(plane);        // mirroring in a plane; the argument must be a CSG.Plane
