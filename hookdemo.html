@@ -69,13 +69,13 @@ and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more inf
 // Here we define the user editable parameters: 
 function getParameterDefinitions() {
   return [
-    { name: 'topdiameter', caption: 'Inner diameter of top hook:', type: 'float', default: 10 },
-    { name: 'clampfactor', caption: 'Snugness of top hook (0 - 100):', type: 'float', default: 20 },
+    { name: 'topdiameter', caption: 'Inner diameter of top hook:', type: 'float', default: 16.7 },
+    { name: 'clampfactor', caption: 'Snugness of top hook (0 - 100):', type: 'float', default: 25 },
     { name: 'cliplength', caption: 'Top hook clip length:', type: 'float', default: 5 },
-    { name: 'bottomdiameter', caption: 'Inner diameter of bottom hook:', type: 'float', default: 15 },
-    { name: 'height', caption: 'Outer height of the hook:', type: 'float', default: 50 },
+    { name: 'bottomdiameter', caption: 'Inner diameter of bottom hook:', type: 'float', default: 20 },
+    { name: 'height', caption: 'Outer height of the hook:', type: 'float', default: 60 },
     { name: 'thickness', caption: 'Thickness:', type: 'float', default: 5 },
-    { name: 'width', caption: 'Width:', type: 'float', default: 10 },
+    { name: 'width', caption: 'Width:', type: 'float', default: 7 },
     {
       name: 'rounded', 
       type: 'choice',
@@ -84,13 +84,17 @@ function getParameterDefinitions() {
       captions: ["No", "Yes (rendering will take a long time!)"], 
       default: 0,
     },    
-    { name: 'roundness', caption: 'Diameter of rounded edges (if enabled):', type: 'float', default: 1 },
+    { name: 'roundness', caption: 'Diameter of rounded edges (if enabled):', type: 'float', default: 1.5 },
+    { name: 'buildwidth', caption: 'Width (x) of build area (to print multiple copies):', type: 'float', default: 90 },
+    { name: 'builddepth', caption: 'Depth (y) of build area (to print multiple copies):', type: 'float', default: 90 },    
   ];
 }
 
 function main(params) {
+  if(OpenJsCad.log) OpenJsCad.log("start");
+  
   var pathresolution = 16;
-  var expandresolution = 16;
+  var expandresolution = 6;
   
   // construct the 2D path:
   var topradius = params.topdiameter/2;
@@ -162,17 +166,44 @@ function main(params) {
   path = path.transform(matrix);
 
   // extrude the path to create a 3D solid
-  var result = path.rectangularExtrude(2*(halfthickness-roundness), params.width-2*roundness, pathresolution, true);
-  result = result.translate([0, 0, -params.width/2+roundness]);
+  var hook = path.rectangularExtrude(2*(halfthickness-roundness), params.width-2*roundness, pathresolution, true);
+  hook = hook.translate([0, 0, -params.width/2+roundness]);
   
   // expand to create rounded corners:
   if(roundness > 0)
   {
-    result = result.expand(roundness, expandresolution);
+    hook = hook.expand(roundness, expandresolution);
   }
+  // hook = hook.toPointCloud(0.1);
+  
+  // determine how many objects will fit in the build area:
+  var bounds = hook.getBounds();
+  var objsize = bounds[1].minus(bounds[0]);
+  var margin = 5; // distance between the copies
+  var numx = Math.floor((params.buildwidth + margin) / (objsize.x + margin));  
+  var numy = Math.floor((params.builddepth + margin) / (objsize.y + margin));
+  if(numx < 1) numx = 1;  
+  if(numy < 1) numy = 1;
+
+  // and make the copies:
+  var result = new CSG();
+  for(var x = 0; x < numx; x++)
+  {
+    var deltax = ((1-numx)/2+x) * (objsize.x + margin); 
+    var colresult = new CSG();
+    for(var y = 0; y < numy; y++)
+    {
+      var deltay = ((1-numy)/2+y) * (objsize.y + margin);
+      var translated = hook.translate(new CSG.Vector3D(deltax, deltay, 0));
+      colresult = colresult.union(translated); 
+    }
+    result = result.union(colresult);
+  }    
    
+  if(OpenJsCad.log) OpenJsCad.log("finish");
   return result;
-}</textarea><br>
+}
+</textarea><br>
 <input type="submit" value="Update" onclick="updateSolid(); return false;">
 <br><br>
 </body>
