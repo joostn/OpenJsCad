@@ -122,6 +122,7 @@ Alt+drag zooms (by changing the distance between camera and model).
 <li><a href="gearsdemo.html">Involute Gears</a></li>
 <li><a href="hookdemo.html">Parametric S hook</a>: shows how to extrude 2d paths</li>
 <li><a href="servodemo.html">Servo motor</a>: shows how to work with properties and connectors</li>
+<li><a href="grilledemo.html">Parametric Grille</a></li>
 </ul>
 <h2>License</h2>
 Copyright (c) 2012 Joost Nieuwenhuijse.
@@ -465,6 +466,15 @@ path = path.close(); // close the path
 
 // of course we could simply have done:
 // var path = new CSG.Path2D([[10,10], [-10,10], [-10,-10], [10,-10]], /* closed = */ true);
+
+// We can make arcs and circles:
+var curvedpath = CSG.Path2D.arc({
+  center: [0,0,0],
+  radius: 10,
+  startangle: 0,
+  endangle: 180,
+  resolution: 16,
+});
 
 // Extrude the path by following it with a rectangle (upright, perpendicular to the path direction)
 // Returns a CSG solid
