@@ -315,7 +315,7 @@ OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, options, cal
   if (options['javascriptPath'] == null) {
     var baseurl = document.location + "";
   } else {
-    var baseurl = document.location.origin + '/' + options['javascriptPath'];
+    var baseurl = 'http://' + document.location.host + '/' + options['javascriptPath'];
   }
   var workerscript = "";
   workerscript += script;
