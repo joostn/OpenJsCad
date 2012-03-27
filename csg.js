@@ -356,45 +356,6 @@ CSG.prototype = {
     return result; 
   },
 
-  mirrored: function(plane) {
-    return this.transform(CSG.Matrix4x4.mirroring(plane));
-  },
-  
-  mirroredX: function() {
-    var plane = new CSG.Plane(new CSG.Vector3D(1,0,0), 0);
-    return this.mirrored(plane);
-  },
-  
-  mirroredY: function() {
-    var plane = new CSG.Plane(new CSG.Vector3D(0,1,0), 0);
-    return this.mirrored(plane);
-  },
-  
-  mirroredZ: function() {
-    var plane = new CSG.Plane(new CSG.Vector3D(0,0,1), 0);
-    return this.mirrored(plane);
-  },
-  
-  translate: function(v) {
-    return this.transform(CSG.Matrix4x4.translation(v));
-  },
-  
-  scale: function(f) {
-    return this.transform(CSG.Matrix4x4.scaling(f));
-  },
-  
-  rotateX: function(deg) {
-    return this.transform(CSG.Matrix4x4.rotationX(deg));
-  },
-  
-  rotateY: function(deg) {
-    return this.transform(CSG.Matrix4x4.rotationY(deg));
-  },
-  
-  rotateZ: function(deg) {
-    return this.transform(CSG.Matrix4x4.rotationZ(deg));
-  },
-  
   toStlString: function() {
     var result="solid csg.js\n";
     this.polygons.map(function(p){ result += p.toStlString(); });
@@ -783,10 +744,10 @@ CSG.prototype = {
     // Now build a polygon on the plane, at any point farther than maxdistance from the plane center:
     var vertices = [];
     var orthobasis = new CSG.OrthoNormalBasis(plane);
-    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(maxdistance,maxdistance))));
-    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,maxdistance))));
-    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,-maxdistance))));
     vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(maxdistance,-maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,-maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(-maxdistance,maxdistance))));
+    vertices.push(new CSG.Vertex(orthobasis.to3D(new CSG.Vector2D(maxdistance,maxdistance))));
     var polygon = new CSG.Polygon(vertices, null, plane.flipped());
     
     // and extrude the polygon into a cube, backwards of the plane:
@@ -1160,8 +1121,8 @@ CSG.cylinder = function(options) {
   var r = CSG.parseOptionAsFloat(options, "radius", 1);
   var slices = CSG.parseOptionAsFloat(options, "resolution", 12);
   var ray = e.minus(s);
-  var axisZ = ray.unit(), isY = (Math.abs(axisZ.y) > 0.5);
-  var axisX = new CSG.Vector3D(isY, !isY, 0).cross(axisZ).unit();
+  var axisZ = ray.unit();
+  var axisX = axisZ.randomNonParallelVector().unit();  
   var axisY = axisX.cross(axisZ).unit();
   var start = new CSG.Vertex(s);
   var end = new CSG.Vertex(e);
@@ -1366,7 +1327,22 @@ CSG.roundedCube = function(options) {
   return result;
 };
 
+CSG.IsFloat = function(n) {
+  return (!isNaN(n)) || (n === Infinity) || (n === -Infinity);
+};
 
+// solve 2x2 linear equation:
+// [ab][x] = [u]
+// [cd][y]   [v]
+CSG.solve2Linear = function(a,b,c,d,u,v) {
+  var det = a*d - b*c;
+  var invdet = 1.0/det;
+  var x = u*d - b*v;
+  var y = -u*c + a*v;
+  x *= invdet;
+  y *= invdet;
+  return [x,y];
+};
 
 // # class Vector3D
 
@@ -1381,9 +1357,9 @@ CSG.roundedCube = function(options) {
 CSG.Vector3D = function(x, y, z) {
   if (arguments.length == 3)
   {
-    this._x = x;
-    this._y = y;
-    this._z = z;
+    this._x = parseFloat(x);
+    this._y = parseFloat(y);
+    this._z = parseFloat(z);
   }
   else
   {
@@ -1400,27 +1376,31 @@ CSG.Vector3D = function(x, y, z) {
         }
         else if(x instanceof Array)
         {
-          this._x = x[0];
-          this._y = x[1];
-          this._z = x[2];
+          this._x = parseFloat(x[0]);
+          this._y = parseFloat(x[1]);
+          this._z = parseFloat(x[2]);
         }  
         else if( ('x' in x) && ('y' in x) && ('z' in x) )
         {
-          this._x = x.x;
-          this._y = x.y;
-          this._z = x.z;
+          this._x = parseFloat(x.x);
+          this._y = parseFloat(x.y);
+          this._z = parseFloat(x.z);
         }
         else ok = false;
       }
       else
       {
-        var v = Number(x);
+        var v = parseFloat(x);
         this._x = v;
         this._y = v;
         this._z = v;
       }
     }
     else ok = false;
+    if(ok)
+    {
+      if( (!CSG.IsFloat(this._x)) || (!CSG.IsFloat(this._y)) || (!CSG.IsFloat(this._z)) ) ok=false;
+    }
     if(!ok)
     {
       throw new Error("wrong arguments");
@@ -1803,8 +1783,7 @@ CSG.Plane.prototype = {
             // line segment intersects plane:
             var point = vertex.pos;
             var nextpoint = vertices[nextvertexindex].pos;
-            var line = CSG.Line3D.fromPoints(point, nextpoint);
-            var intersectionpoint =  this.intersectWithLine(line);
+            var intersectionpoint = this.splitLineBetweenPoints(point,nextpoint);
             var intersectionvertex = new CSG.Vertex(intersectionpoint);
             if(isback)
             {
@@ -1862,6 +1841,18 @@ CSG.Plane.prototype = {
         }
       }
     }
+    return result;
+  },
+
+  // robust splitting of a line by a plane
+  // will work even if the line is parallel to the plane  
+  splitLineBetweenPoints: function(p1, p2) {
+    var direction = p2.minus(p1);
+    var labda = (this.w - this.normal.dot(p1)) / this.normal.dot(direction);
+    if(isNaN(labda)) labda=0;
+    if(labda > 1) labda=1;
+    if(labda < 0) labda=0;
+    var result = p1.plus(direction.times(labda));
     return result;
   },
 
@@ -2785,6 +2776,8 @@ CSG.Matrix4x4.rotationZ = function(degrees) {
 
 // Matrix for rotation about arbitrary point and axis
 CSG.Matrix4x4.rotation = function(rotationCenter, rotationAxis, degrees) {
+  rotationCenter = new CSG.Vector3D(rotationCenter);
+  rotationAxis = new CSG.Vector3D(rotationAxis);
   var rotationPlane = CSG.Plane.fromNormalAndPoint(rotationAxis, rotationCenter);
   var orthobasis = new CSG.OrthoNormalBasis(rotationPlane);
   var transformation = CSG.Matrix4x4.translation(rotationCenter.negated());
@@ -2841,39 +2834,51 @@ CSG.Matrix4x4.scaling = function(v) {
 // # class Vector2D:
 // Represents a 2 element vector
 CSG.Vector2D = function(x, y) {
-  var ok = true;
-  if (arguments.length == 1)
+  if (arguments.length == 2)
   {
-    if(typeof(x) == "object")
+    this._x = parseFloat(x);
+    this._y = parseFloat(y);
+  }
+  else
+  {
+    var ok = true;
+    if (arguments.length == 1)
     {
-      if(x instanceof Array)
+      if(typeof(x) == "object")
       {
-        this.x = x[0];
-        this.y = x[1];
-      }  
-      else if( ('x' in x) && ('y' in x) )
-      {
-        this.x = x.x;
-        this.y = x.y;
+        if(x instanceof CSG.Vector2D)
+        {
+          this._x = x._x;
+          this._y = x._y;
+        }
+        else if(x instanceof Array)
+        {
+          this._x = parseFloat(x[0]);
+          this._y = parseFloat(x[1]);
+        }  
+        else if( ('x' in x) && ('y' in x) )
+        {
+          this._x = parseFloat(x.x);
+          this._y = parseFloat(x.y);
+        }
+        else ok = false;
       }
-      else ok = false;
+      else
+      {
+        var v = parseFloat(x);
+        this._x = v;
+        this._y = v;
+      }
     }
-    else
+    else ok = false;
+    if(ok)
     {
-      var v = Number(x);
-      this.x = v;
-      this.y = v;
+      if( (!CSG.IsFloat(this._x)) || (!CSG.IsFloat(this._y)) ) ok=false;
     }
-  }
-  else if (arguments.length == 2)
-  {
-    this.x = Number(x);
-    this.y = Number(y);
-  }
-  else ok = false;
-  if(!ok)
-  {
-    throw new Error("wrong arguments");
+    if(!ok)
+    {
+      throw new Error("wrong arguments");
+    }
   }
 };
 
@@ -2891,41 +2896,55 @@ CSG.Vector2D.fromAngleRadians = function(radians) {
 };
 
 CSG.Vector2D.prototype = {
+  get x() {
+    return this._x;
+  },
+  get y() {
+    return this._y;
+  },
+  
+  set x(v) {
+    throw new Error("Vector2D is immutable");
+  },
+  set y(v) {
+    throw new Error("Vector2D is immutable");
+  },
+
   // extend to a 3D vector by adding a z coordinate:
   toVector3D: function(z) {
-    return new CSG.Vector3D(this.x, this.y, z);
+    return new CSG.Vector3D(this._x, this._y, z);
   },
   
   equals: function(a) {
-    return (this.x == a.x) && (this.y == a.y);
+    return (this._x == a._x) && (this._y == a._y);
   },
   
   clone: function() {
-    return new CSG.Vector2D(this.x, this.y);
+    return new CSG.Vector2D(this._x, this._y);
   },
 
   negated: function() {
-    return new CSG.Vector2D(-this.x, -this.y);
+    return new CSG.Vector2D(-this._x, -this._y);
   },
 
   plus: function(a) {
-    return new CSG.Vector2D(this.x + a.x, this.y + a.y);
+    return new CSG.Vector2D(this._x + a._x, this._y + a._y);
   },
 
   minus: function(a) {
-    return new CSG.Vector2D(this.x - a.x, this.y - a.y);
+    return new CSG.Vector2D(this._x - a._x, this._y - a._y);
   },
 
   times: function(a) {
-    return new CSG.Vector2D(this.x * a, this.y * a);
+    return new CSG.Vector2D(this._x * a, this._y * a);
   },
 
   dividedBy: function(a) {
-    return new CSG.Vector2D(this.x / a, this.y / a);
+    return new CSG.Vector2D(this._x / a, this._y / a);
   },
 
   dot: function(a) {
-    return this.x * a.x + this.y * a.y;
+    return this._x * a._x + this._y * a._y;
   },
 
   lerp: function(a, t) {
@@ -2946,12 +2965,16 @@ CSG.Vector2D.prototype = {
 
   // returns the vector rotated by 90 degrees clockwise
   normal: function() {
-    return new CSG.Vector2D(this.y, -this.x);
+    return new CSG.Vector2D(this._y, -this._x);
   },
 
   // Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
   // Returns a new CSG.Vector2D
   multiply4x4: function(matrix4x4) {
+    return matrix4x4.leftMultiply1x2Vector(this);
+  },
+  
+  transform: function(matrix4x4) {
     return matrix4x4.leftMultiply1x2Vector(this);
   },
   
@@ -2966,7 +2989,7 @@ CSG.Vector2D.prototype = {
   
   angleRadians: function() {
     // y=sin, x=cos
-    return Math.atan2(this.y, this.x);
+    return Math.atan2(this._y, this._x);
   },
 };
 
@@ -3090,11 +3113,19 @@ CSG.Polygon2D.prototype = {
 // normal must be a unit vector!
 // Equation: p is on line if normal.dot(p)==w
 CSG.Line2D = function(normal, w) {
+  normal=new CSG.Vector2D(normal);
+  w=parseFloat(w);
+  var l=normal.length();
+  // normalize:
+  w *= l;
+  normal=normal.times(1.0/l);
   this.normal = normal;
   this.w = w;
 };
 
 CSG.Line2D.fromPoints = function(p1, p2) {
+  p1=new CSG.Vector2D(p1);
+	p2=new CSG.Vector2D(p2);
   var direction = p2.minus(p1);
   var normal = direction.normal().negated().unit();
   var w = p1.dot(normal);
@@ -3103,7 +3134,7 @@ CSG.Line2D.fromPoints = function(p1, p2) {
 
 CSG.Line2D.prototype = {
   // same line but opposite direction:
-  inverse: function() {
+  reverse: function() {
     return new CSG.Line2D(this.normal.negated(), -this.w);
   },
   
@@ -3121,20 +3152,29 @@ CSG.Line2D.prototype = {
   
   xAtY: function(y) {
     // (py == y) && (normal * p == w)
-    // -> px = (w - normal.y * y) / normal.x
-    var x = (this.w - this.normal.y * y) / this.normal.x;
+    // -> px = (w - normal._y * y) / normal.x
+    var x = (this.w - this.normal._y * y) / this.normal.x;
     return x; 
   },
   
   absDistanceToPoint: function(point) {
+    point=new CSG.Vector2D(point);
     var point_projected = point.dot(this.normal);
     var distance = Math.abs(point_projected - this.w);
     return distance;
   },
   
   closestPoint: function(point) {
+    point=new CSG.Vector2D(point);
     var vector = point.dot(this.direction());
     return origin.plus(vector);  
+  },
+  
+  // intersection between two lines, returns point as Vector2D
+  intersectWithLine: function(line2d) {
+    var point=CSG.solve2Linear(this.normal.x, this.normal.y, line2d.normal.x, line2d.normal.y, this.w, line2d.w);
+    point=new CSG.Vector2D(point); // make  vector2d
+    return point;
   },
 };
 
@@ -3145,11 +3185,15 @@ CSG.Line2D.prototype = {
 // point is a random point on the line
 
 CSG.Line3D = function(point, direction) {
+  point=new CSG.Vector3D(point);
+  direction=new CSG.Vector3D(direction);
   this.point = point;
-  this.direction = direction;
+  this.direction = direction.unit();
 };
 
 CSG.Line3D.fromPoints = function(p1, p2) {
+  p1=new CSG.Vector3D(p1);
+  p2=new CSG.Vector3D(p2);
   var direction = p2.minus(p1).unit();
   return new CSG.Line3D(p1, direction);
 };
@@ -3171,36 +3215,24 @@ CSG.Line3D.fromPlanes = function(p1, p2) {
   {
     // direction vector is mostly pointing towards x
     // find a point p for which x is zero:
-    var r = CSG.Line3D.Solve2Linear(p1.normal.y, p1.normal.z, p2.normal.y, p2.normal.z, p1.w, p2.w);    
+    var r = CSG.solve2Linear(p1.normal.y, p1.normal.z, p2.normal.y, p2.normal.z, p1.w, p2.w);    
     origin = new CSG.Vector3D(0, r[0], r[1]);
   }
   else if( (mabsy >= mabsx) && (mabsy >= mabsz) )
   {
     // find a point p for which y is zero:
-    var r = CSG.Line3D.Solve2Linear(p1.normal.x, p1.normal.z, p2.normal.x, p2.normal.z, p1.w, p2.w);    
+    var r = CSG.solve2Linear(p1.normal.x, p1.normal.z, p2.normal.x, p2.normal.z, p1.w, p2.w);    
     origin = new CSG.Vector3D(r[0], 0, r[1]);
   }
   else
   {
     // find a point p for which z is zero:
-    var r = CSG.Line3D.Solve2Linear(p1.normal.x, p1.normal.y, p2.normal.x, p2.normal.y, p1.w, p2.w);    
+    var r = CSG.solve2Linear(p1.normal.x, p1.normal.y, p2.normal.x, p2.normal.y, p1.w, p2.w);    
     origin = new CSG.Vector3D(r[0], r[1], 0);
   }
   return new CSG.Line3D(origin, direction);
 };
 
-// solve
-// [ab][x] = [u]
-// [cd][y]   [v]
-CSG.Line3D.Solve2Linear = function(a,b,c,d,u,v) {
-  var det = a*d - b*c;
-  var invdet = 1.0/det;
-  var x = u*d - b*v;
-  var y = -u*c + a*v;
-  x *= invdet;
-  y *= invdet;
-  return [x,y];
-};
 
 CSG.Line3D.prototype = {
   intersectWithPlane: function(plane) {
@@ -3228,12 +3260,14 @@ CSG.Line3D.prototype = {
   },  
   
   closestPointOnLine: function(point) {
+    point=new CSG.Vector3D(point);
     var t = point.minus(this.point).dot(this.direction) / this.direction.dot(this.direction);
     var closestpoint = this.point.plus(this.direction.times(t));
     return closestpoint;
   },
   
   distanceToPoint: function(point) {
+    point=new CSG.Vector3D(point);
     var closestpoint = this.closestPointOnLine(point);
     var distancevector = point.minus(closestpoint);
     var distance = distancevector.length();
@@ -3254,19 +3288,14 @@ CSG.Line3D.prototype = {
 // Reprojects points on a 3D plane onto a 2D plane
 // or from a 2D plane back onto the 3D plane
 
-CSG.OrthoNormalBasis = function (plane) {
-  // choose an arbitrary right hand vector, making sure it is somewhat orthogonal to the plane normal:
-  var rightvector;
-  if(Math.abs(plane.normal.x) > Math.abs(plane.normal.y))
+CSG.OrthoNormalBasis = function (plane, rightvector) {
+  if(arguments.length < 2)
   {
-    rightvector = new CSG.Vector3D(0, 1, 0);
+    // choose an arbitrary right hand vector, making sure it is somewhat orthogonal to the plane normal:
+    rightvector = plane.normal.randomNonParallelVector();
   }
-  else
-  {
-    rightvector = new CSG.Vector3D(1, 0, 0);
-  }
-  this.v = rightvector.cross(plane.normal).unit();
-  this.u = plane.normal.cross(this.v);
+  this.v = plane.normal.cross(rightvector).unit();
+  this.u = this.v.cross(plane.normal);
   this.plane = plane;
   this.planeorigin = plane.normal.times(plane.w);
 };
@@ -3282,12 +3311,12 @@ CSG.OrthoNormalBasis.prototype = {
   },
   
   getInverseProjectionMatrix: function() {
-    var wtimesnormal = this.plane.normal.times(this.plane.w);
+    var p = this.plane.normal.times(this.plane.w);
     return new CSG.Matrix4x4([
       this.u.x, this.u.y, this.u.z, 0,
       this.v.x, this.v.y, this.v.z, 0,
       this.plane.normal.x, this.plane.normal.y, this.plane.normal.z, 0,
-      wtimesnormal.x, wtimesnormal.y, wtimesnormal.z, 1      
+      p.x, p.y, p.z, 1
     ]);
   },
   
@@ -3407,22 +3436,25 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons)
           // perform binning of y coordinates: If we have multiple vertices very
           // close to each other, give them the same y coordinate:
           var ycoordinatebin = Math.floor(pos2d.y * ycoordinateBinningFactor);
+          var newy;
           if(ycoordinatebin in ycoordinatebins)
           {
-            pos2d.y = ycoordinatebins[ycoordinatebin];
+            newy = ycoordinatebins[ycoordinatebin];
           }
           else if(ycoordinatebin+1 in ycoordinatebins)
           {
-            pos2d.y = ycoordinatebins[ycoordinatebin+1];
+            newy = ycoordinatebins[ycoordinatebin+1];
           }
           else if(ycoordinatebin-1 in ycoordinatebins)
           {
-            pos2d.y = ycoordinatebins[ycoordinatebin-1];
+            newy = ycoordinatebins[ycoordinatebin-1];
           }
           else
           {
+            newy = pos2d.y;
             ycoordinatebins[ycoordinatebin] = pos2d.y;
           }
+          pos2d = new CSG.Vector2D(pos2d.x, newy);
           vertices2d.push(pos2d);
           var y = pos2d.y;
           if( (i == 0) || (y < miny) )
@@ -3455,6 +3487,9 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons)
           topy2polygonindexes[miny].push(polygonindex);          
         }
       }  // if(numvertices > 0)
+      // reverse the vertex order:
+      vertices2d.reverse();
+      minindex=numvertices-minindex-1;
       polygonvertices2d.push(vertices2d); 
       polygontopvertexindexes.push(minindex); 
     }
@@ -3694,9 +3729,9 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons)
                 // polygon ends with a horizontal line:
                 prevpolygon.outpolygon.leftpoints.push(prevpolygon.bottomleft);
               }
-              // reverse the right half so we get a counterclockwise circle:
-              prevpolygon.outpolygon.rightpoints.reverse();
-              var points2d = prevpolygon.outpolygon.leftpoints.concat(prevpolygon.outpolygon.rightpoints); 
+              // reverse the left half so we get a counterclockwise circle:
+              prevpolygon.outpolygon.leftpoints.reverse();
+              var points2d = prevpolygon.outpolygon.rightpoints.concat(prevpolygon.outpolygon.leftpoints); 
               var vertices3d = [];
               points2d.map(function(point2d) {
                 var point3d = orthobasis.to3D(point2d);
@@ -4459,4 +4494,60 @@ CSG.Path2D.prototype = {
     return new CSG.Path2D(newpoints, this.closed);
   },  
 };
-                                 
+
+// Add several convenience methods to the classes that support a transform() method:
+CSG.addTransformationMethodsToPrototype = function(proto) {
+  proto.mirrored = function(plane) {
+    return this.transform(CSG.Matrix4x4.mirroring(plane));
+  };
+  
+  proto.mirroredX = function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(1,0,0), 0);
+    return this.mirrored(plane);
+  };
+  
+  proto.mirroredY = function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(0,1,0), 0);
+    return this.mirrored(plane);
+  };
+  
+  proto.mirroredZ = function() {
+    var plane = new CSG.Plane(new CSG.Vector3D(0,0,1), 0);
+    return this.mirrored(plane);
+  };
+  
+  proto.translate = function(v) {
+    return this.transform(CSG.Matrix4x4.translation(v));
+  };
+  
+  proto.scale = function(f) {
+    return this.transform(CSG.Matrix4x4.scaling(f));
+  };
+  
+  proto.rotateX = function(deg) {
+    return this.transform(CSG.Matrix4x4.rotationX(deg));
+  };
+  
+  proto.rotateY = function(deg) {
+    return this.transform(CSG.Matrix4x4.rotationY(deg));
+  };
+  
+  proto.rotateZ = function(deg) {
+    return this.transform(CSG.Matrix4x4.rotationZ(deg));
+  };
+
+  proto.rotate = function(rotationCenter, rotationAxis, degrees) {
+    return this.transform(CSG.Matrix4x4.rotation(rotationCenter, rotationAxis, degrees));
+  };
+};
+
+CSG.addTransformationMethodsToPrototype(CSG.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Vector2D.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Vector3D.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Vertex.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Plane.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Polygon.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Polygon2D.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Line3D.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Connector.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Path2D.prototype);

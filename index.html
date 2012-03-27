@@ -576,6 +576,28 @@ function main(params) {
 </pre>
 Or see the <a href="gearsdemo.html">Gears demo</a> for another example of interactive parameters.
 
+<h2>Orthonormal basis</h2>
+An orthonormal basis can be used to convert 3D points to 2D points by projecting them onto a 3D plane.
+An orthonormal basis is constructed from a given plane. Optionally a 'right hand' vector can be given, this
+will become the x axis of the two dimensional plane. If no right hand vector is given, a random one is chosen.
+<br><br>
+Use to2D() and line3Dto2D() to convert from the 3D space to the 2D plane. Use to3D() and line2Dto3D()
+to convert the other way. 
+<br><br>
+getProjectionMatrix() gives the projection matrix to transform into the orthonormal basis. 
+getInverseProjectionMatrix() gives the matrix to transform back into the original basis.
+<pre>
+// construct a plane:
+var plane = CSG.Plane.fromNormalAndPoint([1,1,0], [0,0,1]);
+var orthobasis = new CSG.OrthoNormalBasis(plane);
+// or if we would like a specific right hand vector: 
+// var orthobasis = new CSG.OrthoNormalBasis(plane, [0,0,1]);
+
+var point3d = new CSG.Vector3D(1,5,7);
+var point2d = orthobasis.to2D(point3d);
+var projected = orthobasis.to3D(point2d);
+</pre>
+  
 <h2>Miscellaneous</h2>
 Solids can be given a color using the setColor(r, g, b) function. Beware: this returns a new solid,
 the original solid is not modified! Faces of the solid will keep their original color when doing
@@ -702,6 +724,23 @@ var line2 = line.reverse();                       // same line but reverse direc
 var line2 = line.transform(matrix4x4);            // for rotation, scaling, etc
 var p = line.closestPointOnLine(point);           // project point onto the line
 var d = line.distanceToPoint(point);
+
+// ------------ Line2D --------------------------
+// A line in 2d space is represented by a normal vector and a distance w to the
+// origin along the normal vector
+// A line in 2d space is represented by a point and a direction vector.
+// Direction should be a unit vector. Point can be any point on the line:
+var line = new CSG.Line2D(CSG.Line2D(normal,w));
+// or by giving two points:
+var line = CSG.Line2D.fromPoints(p1, p2);         // argumenst are CSG.Vector2D
+var line2 = line.reverse();                       // same line but reverse direction
+var line2 = line.transform(matrix4x4);            // for rotation, scaling, etc
+var point = line.origin();                        // returns the point closest to the origin
+var dir = line.direction();                       // direction vector (CSG.Vector2D)
+var x = line.xAtY(y);                             // returns the x coordinate of the line at given y coordinate
+var d = absDistanceToPoint(point);                // returns the absolute distance between a point and the line
+var p = line.closestPoint(point);                 // projection of point onto the line
+var point = line.intersectWithLine(line2);        // intersection of two lines, returns CSG.Vector2D
 </pre>
 
 
