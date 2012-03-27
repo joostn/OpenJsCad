@@ -315,8 +315,7 @@ CSG.prototype = {
   },
 
   transform: function(matrix4x4) {
-    var scalefactor = matrix4x4.elements[0] * matrix4x4.elements[5] * matrix4x4.elements[10];
-    var ismirror = (scalefactor < 0);
+    var ismirror = matrix4x4.isMirroring();
     var transformedvertices = {};
     var transformedplanes = {};
     var newpolygons = this.polygons.map(function(p) {
@@ -1373,6 +1372,12 @@ CSG.Vector3D = function(x, y, z) {
           this._x = x._x;
           this._y = x._y;
           this._z = x._z;
+        }
+        else if(x instanceof CSG.Vector2D)
+        {
+          this._x = x._x;
+          this._y = x._y;
+          this._z = 0;
         }
         else if(x instanceof Array)
         {
@@ -2725,6 +2730,20 @@ CSG.Matrix4x4.prototype = {
     }
     return new CSG.Vector2D(x,y);       
   },
+  
+  // determine whether this matrix is a mirroring transformation
+  isMirroring: function() {
+    var u = new CSG.Vector3D(this.elements[0], this.elements[4], this.elements[8]);
+    var v = new CSG.Vector3D(this.elements[1], this.elements[5], this.elements[9]);
+    var w = new CSG.Vector3D(this.elements[2], this.elements[6], this.elements[10]);
+    
+    // for a true orthogonal, non-mirrored base, u.cross(v) == w
+    // If they have an opposite direction then we are mirroring
+    var mirrorvalue=u.cross(v).dot(w);
+    var ismirror=(mirrorvalue < 0);
+    return ismirror;
+  },
+
 };
 
 // return the unity matrix
@@ -3175,6 +3194,17 @@ CSG.Line2D.prototype = {
     var point=CSG.solve2Linear(this.normal.x, this.normal.y, line2d.normal.x, line2d.normal.y, this.w, line2d.w);
     point=new CSG.Vector2D(point); // make  vector2d
     return point;
+  },
+  
+  transform: function(matrix4x4) {
+    var origin = new CSG.Vector2D(0,0);
+    var pointOnPlane = this.normal.times(this.w);
+    var neworigin = origin.multiply4x4(matrix4x4);
+    var neworiginPlusNormal = this.normal.multiply4x4(matrix4x4);
+    var newnormal = neworiginPlusNormal.minus(neworigin);
+    var newpointOnPlane = pointOnPlane.multiply4x4(matrix4x4);
+    var neww = newnormal.dot(newpointOnPlane);
+    return new CSG.Line2D(newnormal, neww);
   },
 };
 
@@ -4112,8 +4142,8 @@ CSG.Properties.addFrom = function(result, otherproperties)
 
 CSG.Connector = function(point, axisvector, normalvector) {
   this.point = new CSG.Vector3D(point);
-  this.axisvector = new CSG.Vector3D(axisvector);
-  this.normalvector = new CSG.Vector3D(normalvector);
+  this.axisvector = new CSG.Vector3D(axisvector).unit();
+  this.normalvector = new CSG.Vector3D(normalvector).unit();
 };
 
 CSG.Connector.prototype = {
@@ -4551,3 +4581,4 @@ CSG.addTransformationMethodsToPrototype(CSG.Polygon2D.prototype);
 CSG.addTransformationMethodsToPrototype(CSG.Line3D.prototype);
 CSG.addTransformationMethodsToPrototype(CSG.Connector.prototype);
 CSG.addTransformationMethodsToPrototype(CSG.Path2D.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.Line2D.prototype);
