@@ -4209,6 +4209,12 @@ CSG.Connector.prototype = {
   
   axisLine: function() {
     return new CSG.Line3D(this.point, this.axisvector);
+  },
+  
+  // creates a new Connector, with the connection point moved in the direction of the axisvector
+  extend: function(distance) {
+    var newpoint = this.point.plus(this.axisvector.unit().times(distance));
+    return new CSG.Connector(newpoint, this.axisvector, this.normalvector);
   },  
 };
 
