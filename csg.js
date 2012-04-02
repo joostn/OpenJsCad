@@ -3100,14 +3100,30 @@ CSG.Polygon2D.prototype = {
       var levelpolygon = getTwistedPolygon(twiststep);
       for(var i=0; i < numvertices; i++)
       {
+        var nexti = (i < (numvertices-1))? i+1:0;       
         var sidefacepoints = [];
-        var nexti = (i < (numvertices-1))? i+1:0;
         sidefacepoints.push(prevlevelpolygon.vertices[i].pos);
         sidefacepoints.push(levelpolygon.vertices[i].pos);
         sidefacepoints.push(levelpolygon.vertices[nexti].pos);
-        sidefacepoints.push(prevlevelpolygon.vertices[nexti].pos);
+        if(twistangle == 0)
+        {
+          // if we are not twisting then the side faces are flat squares.
+          // One polygon per side face is sufficient:
+          sidefacepoints.push(prevlevelpolygon.vertices[nexti].pos);
+        }
         var sidefacepolygon=CSG.Polygon.createFromPoints(sidefacepoints, this.shared);
         newpolygons.push(sidefacepolygon);
+        if(twistangle != 0)
+        {
+          // we are twisting; in that case each side face consists of two
+          // triangles:
+          sidefacepoints = [];
+          sidefacepoints.push(prevlevelpolygon.vertices[i].pos);
+          sidefacepoints.push(levelpolygon.vertices[nexti].pos);
+          sidefacepoints.push(prevlevelpolygon.vertices[nexti].pos);
+          sidefacepolygon=CSG.Polygon.createFromPoints(sidefacepoints, this.shared);
+          newpolygons.push(sidefacepolygon);
+        }
       }
       if(twiststep == (twiststeps -1) )
       {
