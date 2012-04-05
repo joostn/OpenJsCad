@@ -65,7 +65,8 @@ Below is the OpenJsCad script for this demo. To build your own models, create a 
 and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
 <a href="index.html">OpenJsCad documentation</a>. 
 <br><br> 
-<textarea id="code">var cylresolution=16;
+<textarea id="code">
+var cylresolution=16;
 
 // Here we define the user editable parameters: 
 function getParameterDefinitions() {
@@ -79,13 +80,13 @@ function getParameterDefinitions() {
       default: 0,
     },    
   
-    { name: 'diameter1', caption: 'Axis diameter of first coupler:', type: 'float', default: 12 },
+    { name: 'diameter1', caption: 'Axis diameter of first coupler:', type: 'float', default: 12.2 },
     { name: 'shaftlength1', caption: 'Axis depth of first coupler:', type: 'float', default: 15 },
     { name: 'outerlength1', caption: 'Outer length of first coupler:', type: 'float', default: 20 },
     { name: 'nutradius1', caption: 'Nut radius of first coupler:', type: 'float', default: 4.65 },
     { name: 'nutthickness1', caption: 'Nut thickness of first coupler:', type: 'float', default: 4.2},
     { name: 'screwdiameter1', caption: 'Screw diameter of first coupler:', type: 'float', default: 5},
-    { name: 'diameter2', caption: 'Axis diameter of second coupler:', type: 'float', default: 10 },
+    { name: 'diameter2', caption: 'Axis diameter of second coupler:', type: 'float', default: 9.5 },
     { name: 'shaftlength2', caption: 'Axis depth of second coupler:', type: 'float', default: 10 },
     { name: 'outerlength2', caption: 'Outer length of second coupler:', type: 'float', default: 15 },
     { name: 'nutradius2', caption: 'Nut radius of second coupler:', type: 'float', default: 3.2 },
@@ -124,7 +125,7 @@ function main(params)
   
   var result=part1.translate([-outerdiameter-5,0,0]);
   result=result.union(part2.translate([0,0,0]));
-  result=result.union(spider.translate([outerdiameter+5,0,0]));
+  result=result.union(spider.translate([outerdiameter+5,0,-params.spidermargin]));
   return result;
 }
 
@@ -154,7 +155,7 @@ function makeShaft(innerdiameter, outerdiameter, spidercenterdiameter, shaftleng
   });
   nutcutout = nutcutout.union(nutcutoutrectangle);
   nutcutout = nutcutout.rotateY(90);
-  nutcutout = nutcutout.translate([(outerdiameter-innerdiameter)/2, 0, screwz]);
+  nutcutout = nutcutout.translate([(outerdiameter+innerdiameter)/4, 0, screwz]);
   result = result.subtract(nutcutout);
   
   var screwcutout=CSG.cylinder({
@@ -225,7 +226,6 @@ function makeSpider(outerdiameter, spidercenterdiameter, spiderlength, numteeth)
 
   return result;
 }
-
 </textarea><br>
 <input type="submit" value="Update" onclick="updateSolid(); return false;">
 <br><br>
