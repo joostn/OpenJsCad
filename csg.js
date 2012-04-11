@@ -3,10 +3,11 @@ var _CSGDEBUG=false;
 /*
 ## License
 
-Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl) under MIT license
+Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl)
+Copyright (c) 2011 Evan Wallace (http://evanw.github.com/csg.js/)
+Copyright (c) 2012 Alexandre Girard (https://github.com/alx)
 
-Based on original CSG.js: http://evanw.github.com/csg.js/
-Copyright (c) 2011 Evan Wallace under MIT license
+All code released under MIT license
 
 ## Overview
 
@@ -1118,32 +1119,46 @@ CSG.cylinder = function(options) {
   var s = CSG.parseOptionAs3DVector(options, "start", [0, -1, 0]);
   var e = CSG.parseOptionAs3DVector(options, "end", [0, 1, 0]);
   var r = CSG.parseOptionAsFloat(options, "radius", 1);
+  var rEnd = CSG.parseOptionAsFloat(options, "radiusEnd", r);
+  var rStart = CSG.parseOptionAsFloat(options, "radiusStart", r);
   var slices = CSG.parseOptionAsFloat(options, "resolution", 12);
   var ray = e.minus(s);
-  var axisZ = ray.unit();
+  var axisZ = ray.unit(); //, isY = (Math.abs(axisZ.y) > 0.5);
   var axisX = axisZ.randomNonParallelVector().unit();  
+ 
+//  var axisX = new CSG.Vector3D(isY, !isY, 0).cross(axisZ).unit();
   var axisY = axisX.cross(axisZ).unit();
   var start = new CSG.Vertex(s);
   var end = new CSG.Vertex(e);
   var polygons = [];
-  function point(stack, slice, normalBlend) {
+  function point(stack, slice, radius) {
     var angle = slice * Math.PI * 2;
     var out = axisX.times(Math.cos(angle)).plus(axisY.times(Math.sin(angle)));
-    var pos = s.plus(ray.times(stack)).plus(out.times(r));
-    var normal = out.times(1 - Math.abs(normalBlend)).plus(axisZ.times(normalBlend));
+    var pos = s.plus(ray.times(stack)).plus(out.times(radius));
     return new CSG.Vertex(pos);
   }
   for (var i = 0; i < slices; i++) {
     var t0 = i / slices, t1 = (i + 1) / slices;
-    polygons.push(new CSG.Polygon([start, point(0, t0, -1), point(0, t1, -1)]));
-    polygons.push(new CSG.Polygon([point(0, t1, 0), point(0, t0, 0), point(1, t0, 0), point(1, t1, 0)]));
-    polygons.push(new CSG.Polygon([end, point(1, t1, 1), point(1, t0, 1)]));
+    if(rEnd == rStart){
+      polygons.push(new CSG.Polygon([start, point(0, t0, r), point(0, t1, r)]));
+      polygons.push(new CSG.Polygon([point(0, t1, r), point(0, t0, r), point(1, t0, r), point(1, t1, r)]));
+      polygons.push(new CSG.Polygon([end, point(1, t1, r), point(1, t0, r)]));
+    } else {
+      if (rStart > 0){
+        polygons.push(new CSG.Polygon([start, point(0, t0, rStart), point(0, t1, rStart)]));
+        polygons.push(new CSG.Polygon([point(0, t0, rStart), point(1, t0, rEnd), point(0, t1, rStart)]));
+      }
+      if (rEnd > 0){
+        polygons.push(new CSG.Polygon([end, point(1, t1, rEnd), point(1, t0, rEnd)]));
+        polygons.push(new CSG.Polygon([point(1, t0, rEnd), point(1, t1, rEnd), point(0, t1, rStart)]));
+      }
+    }
   }
   var result = CSG.fromPolygons(polygons);  
   result.properties.cylinder = new CSG.Properties();
   result.properties.cylinder.start = new CSG.Connector(s, axisZ.negated(), axisX);
   result.properties.cylinder.end = new CSG.Connector(e, axisZ, axisX);
-  result.properties.cylinder.facepoint = s.plus(axisX.times(r));
+  result.properties.cylinder.facepoint = s.plus(axisX.times(rStart));
   return result;
 };
 
