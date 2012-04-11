@@ -10,7 +10,7 @@ The benefits over openSCAD are mainly in the language itself: you can use dynami
 
 Contributions are welcome, fork me on GitHub!
 
-The only content here is the 'GUI' part (i.e. index.html) in the gh-pages branch at https://github.com/joostn/OpenJsCad/tree/gh-pages  
+The only content here is in the gh-pages branch at https://github.com/joostn/OpenJsCad/tree/gh-pages  
 
 The actual CSG engine is in csg.js, while OpenJsCad.js contains the user interface.
 
