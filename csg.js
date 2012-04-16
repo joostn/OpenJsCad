@@ -1139,7 +1139,7 @@ CSG.cylinder = function(options) {
   }
   for (var i = 0; i < slices; i++) {
     var t0 = i / slices, t1 = (i + 1) / slices;
-    if(rEnd == rStart){
+    if(r == rStart && r == rEnd){
       polygons.push(new CSG.Polygon([start, point(0, t0, r), point(0, t1, r)]));
       polygons.push(new CSG.Polygon([point(0, t1, r), point(0, t0, r), point(1, t0, r), point(1, t1, r)]));
       polygons.push(new CSG.Polygon([end, point(1, t1, r), point(1, t0, r)]));
