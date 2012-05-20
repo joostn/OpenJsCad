@@ -1121,6 +1121,16 @@ CSG.cylinder = function(options) {
   var r = CSG.parseOptionAsFloat(options, "radius", 1);
   var rEnd = CSG.parseOptionAsFloat(options, "radiusEnd", r);
   var rStart = CSG.parseOptionAsFloat(options, "radiusStart", r);
+  
+  if( (rEnd < 0) || (rStart < 0) )
+  {
+    throw new Error("Radius should be non-negative");
+  }
+  if( (rEnd == 0) && (rStart == 0) )
+  {
+    throw new Error("Either radiusStart or radiusEnd should be positive");
+  }
+  
   var slices = CSG.parseOptionAsFloat(options, "resolution", 12);
   var ray = e.minus(s);
   var axisZ = ray.unit(); //, isY = (Math.abs(axisZ.y) > 0.5);
@@ -1140,9 +1150,9 @@ CSG.cylinder = function(options) {
   for (var i = 0; i < slices; i++) {
     var t0 = i / slices, t1 = (i + 1) / slices;
     if(rEnd == rStart){
-      polygons.push(new CSG.Polygon([start, point(0, t0, r), point(0, t1, r)]));
-      polygons.push(new CSG.Polygon([point(0, t1, r), point(0, t0, r), point(1, t0, r), point(1, t1, r)]));
-      polygons.push(new CSG.Polygon([end, point(1, t1, r), point(1, t0, r)]));
+      polygons.push(new CSG.Polygon([start, point(0, t0, rEnd), point(0, t1, rEnd)]));
+      polygons.push(new CSG.Polygon([point(0, t1, rEnd), point(0, t0, rEnd), point(1, t0, rEnd), point(1, t1, rEnd)]));
+      polygons.push(new CSG.Polygon([end, point(1, t1, rEnd), point(1, t0, rEnd)]));
     } else {
       if (rStart > 0){
         polygons.push(new CSG.Polygon([start, point(0, t0, rStart), point(0, t1, rStart)]));
