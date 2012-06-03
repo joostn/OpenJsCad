@@ -107,6 +107,19 @@ function fileChanged()
   parseFile(false);
 }
 
+var autoReloadTimer = null;
+function toggleAutoReload() {
+	if (document.getElementById("autoreload").checked) {
+		autoReloadTimer = setInterval(parseFile, 1000);
+	} else {
+		if (autoReloadTimer !== null) {
+			clearInterval(autoReloadTimer);
+			autoReloadTimer = null;
+		}
+	}
+}
+
+var previousScript = null;
 function parseFile(debugging)
 {
   if(gCurrentFile)
@@ -132,12 +145,13 @@ function parseFile(debugging)
         }
         else
         {         
-          if(gProcessor)
+          if(gProcessor && previousScript !== jscadscript)
           {
             var filename = gCurrentFile.name;
             filename = filename.replace(/^.*\/([^\/]*)$/, "$1");
             gProcessor.setDebugging(debugging); 
             gProcessor.setJsCad(jscadscript, filename);
+						previousScript = jscadscript;
           }
         }
       }
@@ -145,6 +159,7 @@ function parseFile(debugging)
       {
         throw new Error("Failed to read file");
         if(gProcessor) gProcessor.clearViewer();
+				previousScript = null;
       }
     };
     reader.readAsText(gCurrentFile, "UTF-8");
@@ -165,6 +180,7 @@ function parseFile(debugging)
       <button id="getstlbutton" style="display:none" onclick="getStl();">Get STL</button>
       <button onclick="parseFile(false);">Reload</button>
       <button onclick="parseFile(true);">Debug (see below)</button>
+	  <label for="autoreload">Auto Reload</label><input type="checkbox" name="autoreload" value="" id="autoreload" onclick="toggleAutoReload();">
     </div>
   </div>
 </div>
