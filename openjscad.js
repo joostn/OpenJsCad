@@ -306,12 +306,17 @@ OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
 };
 
 // callback: should be function(error, csg)
-OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, callback) {
+OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, options, callback) {
   var baselibraries = [
     "csg.js",
     "openjscad.js"
   ];
-  var baseurl = document.location + "";
+
+  if (options['javascriptPath'] == null) {
+    var baseurl = document.location + "";
+  } else {
+    var baseurl = 'http://' + document.location.host + '/' + options['javascriptPath'];
+  }
   var workerscript = "";
   workerscript += script;
   workerscript += "\n\n\n\n//// The following code is added by OpenJsCad:\n";
@@ -466,6 +471,7 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.script = null;
   this.hasError = false;
   this.debugging = false;
+  this.javascriptPath = null;
   this.createElements();
 };
 
@@ -577,6 +583,10 @@ OpenJsCad.Processor.prototype = {
     this.statusdiv.style.display = this.hasError? "none":"block";    
   },
   
+  setJavascriptPath: function(path) {
+    this.javascriptPath = path;
+  },
+
   setError: function(txt) {
     this.hasError = (txt != "");
     this.errorpre.innerText = txt;
@@ -680,7 +690,7 @@ OpenJsCad.Processor.prototype = {
     {
       try
       {
-        this.worker = OpenJsCad.javaScriptToSolidASync(this.script, paramValues, function(err, csg) {
+        this.worker = OpenJsCad.javaScriptToSolidASync(this.script, paramValues, { javascriptPath: this.javascriptPath }, function(err, csg) {
           that.processing = false;
           that.worker = null;
           if(err)
