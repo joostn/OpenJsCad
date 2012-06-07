@@ -1721,14 +1721,19 @@ CSG.Plane.prototype = {
   },
   
   transform: function(matrix4x4) {
-    var origin = new CSG.Vector3D(0,0,0);
-    var pointOnPlane = this.normal.times(this.w);
-    var neworigin = origin.multiply4x4(matrix4x4);
-    var neworiginPlusNormal = this.normal.multiply4x4(matrix4x4);
-    var newnormal = neworiginPlusNormal.minus(neworigin).unit();
-    var newpointOnPlane = pointOnPlane.multiply4x4(matrix4x4);
-    var neww = newnormal.dot(newpointOnPlane);
-    return new CSG.Plane(newnormal, neww);
+    // get two vectors in the plane:
+    var u = this.normal.randomNonParallelVector();
+    var v = this.normal.cross(u);
+    // get 3 points in the plane:
+    var point1 = this.normal.times(this.w);
+    var point2 = point1.plus(u);
+    var point3 = point1.plus(v);
+    // transform the points:
+    point1 = point1.multiply4x4(matrix4x4);
+    point2 = point2.multiply4x4(matrix4x4);
+    point3 = point3.multiply4x4(matrix4x4);
+    // and create a new plane from the transformed points:
+    return CSG.Plane.fromVector3Ds(point1, point2, point3);
   },
 
   // Returns object:
