@@ -362,19 +362,28 @@ OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, callback) {
   return worker;
 };
 
-OpenJsCad.textToBlobUrl = function(txt) {
+OpenJsCad.getBlobBuilder = function() {
   var bb;
   if(window.BlobBuilder) bb = new window.BlobBuilder()
   else if(window.WebKitBlobBuilder) bb = new window.WebKitBlobBuilder()
   else if(window.MozBlobBuilder) bb = new window.MozBlobBuilder()
   else throw new Error("Your browser doesn't support BlobBuilder");
+  return bb;
+};
+
+OpenJsCad.getWindowURL = function() {
+  if(window.URL) return window.URL;
+  else if(window.webkitURL) return window.webkitURL;
+  else throw new Error("Your browser doesn't support window.URL");
+};
+
+OpenJsCad.textToBlobUrl = function(txt) {
+  var bb=OpenJsCad.getBlobBuilder();
+  var windowURL=OpenJsCad.getWindowURL();
 
   bb.append(txt);
   var blob = bb.getBlob();
-  var blobURL;
-  if(window.URL) blobURL = window.URL.createObjectURL(blob)
-  else if(window.webkitURL) blobURL = window.webkitURL.createObjectURL(blob)
-  else throw new Error("Your browser doesn't support window.URL");
+  var blobURL = windowURL.createObjectURL(blob)
   if(!blobURL) throw new Error("createObjectURL() failed"); 
   return blobURL;
 };
@@ -522,6 +531,7 @@ OpenJsCad.Processor.prototype = {
     this.statusbuttons.appendChild(this.generateStlButton);
     this.downloadStlLink = document.createElement("a");
     this.downloadStlLink.innerHTML = "Download STL";
+//    this.downloadStlLink.type = "application/sla";  // mime type for .stl files
     this.statusbuttons.appendChild(this.downloadStlLink);
     this.parametersdiv = document.createElement("div");
     this.parametersdiv.className = "parametersdiv";
@@ -789,8 +799,13 @@ OpenJsCad.Processor.prototype = {
   },
   
   generateStlBlobUrl: function() {
-    var stltxt = this.solid.toStlString();
-    this.stlBlobUrl = OpenJsCad.textToBlobUrl(stltxt);
+    var bb=OpenJsCad.getBlobBuilder();    
+    var windowURL=OpenJsCad.getWindowURL();
+    this.solid.toStlBinary(bb);
+    var blob = bb.getBlob();
+    this.stlBlobUrl = windowURL.createObjectURL(blob)
+    if(!this.stlBlobUrl) throw new Error("createObjectURL() failed"); 
+
     this.hasstl = true;
     this.downloadStlLink.href = this.stlBlobUrl;
     this.enableItems();
@@ -798,16 +813,11 @@ OpenJsCad.Processor.prototype = {
   },
 
   generateStlFileSystem: function() {
-    var stltxt = this.solid.toStlString();
+    // var stltxt = this.solid.toStlString();
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
-    window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
     if(!window.requestFileSystem)
     {
       throw new Error("Your browser does not support the HTML5 FileSystem API. Please try the Chrome browser instead.");
-    }
-    if(!window.BlobBuilder)
-    {
-      throw new Error("Your browser does not support the HTML5 BlobBuilder API. Please try the Chrome browser instead.");
     }
     // create a random directory name:
     var dirname = "OpenJsCadStlOutput1_"+parseInt(Math.random()*1000000000, 10)+".stl";
@@ -821,6 +831,7 @@ OpenJsCad.Processor.prototype = {
                     fileWriter.onwriteend = function(e) {
                       that.hasstl = true;
                       that.downloadStlLink.href = fileEntry.toURL();
+                      that.downloadStlLink.type="application/sla";
                       that.enableItems();
                       if(that.onchange) that.onchange();
                     };
@@ -828,9 +839,11 @@ OpenJsCad.Processor.prototype = {
                       throw new Error('Write failed: ' + e.toString());
                     };
                     // Create a new Blob and write it to log.txt.
-                    var bb = new window.BlobBuilder(); // Note: window.WebKitBlobBuilder in Chrome 12.
-                    bb.append(stltxt);
-                    fileWriter.write(bb.getBlob());                
+                    var bb=OpenJsCad.getBlobBuilder();    
+                    that.solid.toStlBinary(bb);
+                    // bb.append(stltxt);
+                    var blob=bb.getBlob("application/sla");
+                    fileWriter.write(blob);                
                   }, 
                   function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 
                 );

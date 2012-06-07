@@ -363,6 +363,60 @@ CSG.prototype = {
     return result;
   },
   
+  // see http://en.wikipedia.org/wiki/STL_%28file_format%29#Binary_STL
+  toStlBinary: function(blobbuilder) {
+    // first check if the host is little-endian:
+    var buffer = new ArrayBuffer(4);
+    var int32buffer = new Int32Array(buffer, 0, 1);
+    var int8buffer = new Int8Array(buffer, 0, 4);
+    int32buffer[0] = 0x11223344;
+    if(int8buffer[0] != 0x44)
+    {
+      throw new Error("Binary STL output is currently only supported on little-endian (Intel) processors");
+    }
+        
+    var numtriangles=0;
+    this.polygons.map(function(p){
+      var numvertices = p.vertices.length;
+      var thisnumtriangles = (numvertices >= 3)? numvertices-2:0; 
+      numtriangles += thisnumtriangles; 
+    });
+    var headerarray = new Uint8Array(80);
+    for(var i=0; i < 80; i++)
+    {
+      headerarray[i]=65;
+    }
+    blobbuilder.append(headerarray.buffer);
+    var ar1 = new Uint32Array(1);
+    ar1[0] = numtriangles;
+    blobbuilder.append(ar1.buffer);
+    buffer = new ArrayBuffer(50);
+    var byteoffset=0;
+    this.polygons.map(function(p){ 
+      var numvertices = p.vertices.length;
+      for(var i = 0; i < numvertices-2; i++)
+      {
+        var float32array = new Float32Array(buffer, 0, 12);
+        var normal = p.plane.normal;
+        float32array[0] = normal._x;
+        float32array[1] = normal._y;
+        float32array[2] = normal._z;
+        var arindex = 3;
+        for(var v = 0; v < 3; v++)
+        {
+          var vv=v + ((v > 0)? i:0);
+          var vertexpos = p.vertices[vv].pos;
+          float32array[arindex++] = vertexpos._x;
+          float32array[arindex++] = vertexpos._y;
+          float32array[arindex++] = vertexpos._z;
+        }
+        var uint16array = new Uint16Array(buffer, 48, 1);
+        uint16array[0]=0;
+        blobbuilder.append(buffer);
+      }
+    });
+  },
+  
   toString: function() {
     var result = "CSG solid:\n";
     this.polygons.map(function(p){ result += p.toString(); });
@@ -1540,7 +1594,7 @@ CSG.Vector3D.prototype = {
   toStlString: function() {
     return this._x+" "+this._y+" "+this._z;
   },
-  
+
   toString: function() {
     return "("+this._x+", "+this._y+", "+this._z+")";
   },
