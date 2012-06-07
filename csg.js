@@ -1725,7 +1725,7 @@ CSG.Plane.prototype = {
     var pointOnPlane = this.normal.times(this.w);
     var neworigin = origin.multiply4x4(matrix4x4);
     var neworiginPlusNormal = this.normal.multiply4x4(matrix4x4);
-    var newnormal = neworiginPlusNormal.minus(neworigin);
+    var newnormal = neworiginPlusNormal.minus(neworigin).unit();
     var newpointOnPlane = pointOnPlane.multiply4x4(matrix4x4);
     var neww = newnormal.dot(newpointOnPlane);
     return new CSG.Plane(newnormal, neww);

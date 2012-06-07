@@ -104,13 +104,15 @@ function fileChanged()
     document.getElementById("filedropzone_filled").style.display = "none";
     document.getElementById("filedropzone_empty").style.display = "block";
   }
-  parseFile(false);
+  parseFile(false,false);
 }
 
 var autoReloadTimer = null;
 function toggleAutoReload() {
 	if (document.getElementById("autoreload").checked) {
-		autoReloadTimer = setInterval(parseFile, 1000);
+		autoReloadTimer = setInterval(function(){
+		  parseFile(false,true);
+    }, 1000);
 	} else {
 		if (autoReloadTimer !== null) {
 			clearInterval(autoReloadTimer);
@@ -120,7 +122,7 @@ function toggleAutoReload() {
 }
 
 var previousScript = null;
-function parseFile(debugging)
+function parseFile(debugging, onlyifchanged)
 {
   if(gCurrentFile)
   {
@@ -145,7 +147,7 @@ function parseFile(debugging)
         }
         else
         {         
-          if(gProcessor && previousScript !== jscadscript)
+          if(gProcessor && ((!onlyifchanged) || (previousScript !== jscadscript)))
           {
             var filename = gCurrentFile.name;
             filename = filename.replace(/^.*\/([^\/]*)$/, "$1");
@@ -178,8 +180,8 @@ function parseFile(debugging)
     <span id="currentfile">dfghdfgh</span>
     <div id="filebuttons">
       <button id="getstlbutton" style="display:none" onclick="getStl();">Get STL</button>
-      <button onclick="parseFile(false);">Reload</button>
-      <button onclick="parseFile(true);">Debug (see below)</button>
+      <button onclick="parseFile(false,false);">Reload</button>
+      <button onclick="parseFile(true,false);">Debug (see below)</button>
 	  <label for="autoreload">Auto Reload</label><input type="checkbox" name="autoreload" value="" id="autoreload" onclick="toggleAutoReload();">
     </div>
   </div>
