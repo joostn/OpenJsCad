@@ -1776,7 +1776,8 @@ CSG.Plane.prototype = {
   
   transform: function(matrix4x4) {
     // get two vectors in the plane:
-    var u = this.normal.randomNonParallelVector();
+    var r = this.normal.randomNonParallelVector(); 
+    var u = this.normal.cross(r);
     var v = this.normal.cross(u);
     // get 3 points in the plane:
     var point1 = this.normal.times(this.w);
