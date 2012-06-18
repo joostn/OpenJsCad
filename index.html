@@ -146,7 +146,9 @@ In other words: <code>radius: 1</code> will give <code>radius: [1,1,1]</code>.
 All rounded solids have a 'resolution' parameter which controls tesselation. If resolution
 is set to 8, then 8 polygons per 360 degree of revolution are used. Beware that rendering
 time will increase dramatically when increasing the resolution. For a sphere the number of polygons
-increases quadratically with the resolution used.
+increases quadratically with the resolution used. If the resolution parameter is omitted, the following
+two global defaults are used: CSG.defaultResolution2D and CSG.defaultResolution3D. The former
+is used for 2D curves (circle, cylinder), the latter for 3D curves (sphere, 3D expand).
 <br><br> 
 <pre>
 // a cube:
@@ -203,6 +205,11 @@ are not modified:
 var csg1 = cube.union(sphere);
 var csg2 = cube.intersect(sphere);
 var csg3 = cube.subtract(sphere);
+
+// combine multiple solids in one go (faster):
+var csg1 = cube.union([solid1, solid2, solid3]);
+var csg2 = cube.intersect([solid1, solid2, solid3]);
+var csg3 = cube.subtract([solid1, solid2, solid3]);
 </pre>
 
 <h2>Transformations</h2>
@@ -432,29 +439,46 @@ return cube1.union(cube2);
 </pre>
 
 <h2>2D shapes</h2>
-Two dimensional shapes can be defined through the Polygon2D class. Currently this requires the polygon to be convex
-(i.e. all corners less than 180 degrees). Shapes can be transformed (rotation, translation, scaling).
-To actually use the shape it needs to be extruded into a 3D CSG object through the extrude() function. extrude()
+Two dimensional shapes can be defined through the CAG class. CAG stands for 'Constructive Area Geometry' which is the 2D
+variant of CSG. Arbitrary shapes can be constructed through CAG.fromPoints(), or one of the primitives CAG.circle(),
+CAG.rectangle() or CAG.roundedRectangle() can be used. Most of the operations for 3D CSG solids are defined for 2D CAG shapes
+as well:
+<ul>
+  <li>union, subtract, intersect</li> 
+  <li>translate, scale, rotate, mirror. For rotation rotateZ() should be used, which rotates about the origin.</li>
+  <li>expand(), contract()</li>
+</ul>
+To actually use the CAG shape it needs to be extruded into a 3D CSG object through the extrude() function. extrude()
 places the 2D solid onto the z=0 plane, and extrudes in the specified direction. Extrusion can be done with an optional
 twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
 The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
 between the bottom and top surface.
 <pre>
 // Create a shape; argument is an array of 2D coordinates
-// The shape must be convex, can be specified in clockwise or in counterclockwise direction 
-var shape2d=new CSG.Polygon2D([[0,0], [5,0], [3,5], [0,5]]);
+var shape1 = CAG.fromPoints([[0,0], [5,0], [3,5], [0,5]]);
+
+// 2D primitives:
+var shape2 = CAG.circle({center: [-2, -2], radius: 4, resolution: 20});
+var shape3 = CAG.rectangle({center: [5, -2], radius: [2, 3]});
+var shape4 = CAG.roundedRectangle({center: [5, 7], radius: [4, 4], roundradius: 1, resolution: 24});
+
+// Expand one of the shapes: first parameter is expand radius, second is the resolution:
+shape1 = shape1.expand(1, 20);
+
+var shape = shape1.union([shape2, shape3, shape4]);
 
 // Do some transformations:
-shape2d=shape2d.translate([-2, -2]);
-shape2d=shape2d.rotate(20);
-shape2d=shape2d.scale([0.2, 0.2]);
+shape=shape.translate([-2, -2]);
+shape=shape.rotateZ(20);
+shape=shape.scale([0.7, 0.9]);
 
 // And extrude. This creates a CSG solid:
-var extruded=shape2d.extrude({
-  offset: [0.5, 0, 2],   // direction for extrusion
-  twistangle: 180,       // top surface is rotated 180 degrees 
-  twiststeps: 100        // create 100 slices
+var extruded=shape.extrude({
+  offset: [0.5, 0, 10],   // direction for extrusion
+  twistangle: 30,       // top surface is rotated 30 degrees 
+  twiststeps: 10        // create 10 slices
 });
+return extruded;  
 </pre>
 For an example of 2D shapes see the <a href="hookdemo.html">Parametric S hook</a> demo.
 
@@ -462,9 +486,22 @@ For an example of 2D shapes see the <a href="hookdemo.html">Parametric S hook</a
 A path is simply a series of points, connected by lines. A path can be open or closed (an additional line
 is drawn between the first and last point). 2D paths are supported through the CSG.Path2D class.
 <br><br>
+The difference between a 2D Path and a 2D CAG is that a path is a 'thin' line, whereas a CAG is an enclosed
+area.
+<br><br>
 Paths can be contructed either by giving a series of 2D coordinates, or through the CSG.Path2D.arc() function,
 which creates a circular curved path. Paths can be concatenated, the result is a new path.
 <br><br>
+A path can be converted to a CAG in two ways:
+<ul>
+<li>expandToCAG(pathradius, resolution) traces the path with a circle, in effect making the path's line segments
+thick.</li>
+<li>innerToCAG() creates a CAG bounded by the path. The path should be a closed path.</li>
+</ul>
+
+<li>
+
+
 Creating a 3D solid is currently supported by the rectangularExtrude() function. This creates a 3D shape
 by following the path with a 2D rectangle (upright, perpendicular to the path direction).
 <pre>
@@ -668,10 +705,15 @@ vec.dividedBy(-5)
 vec.dot(othervector)
 vec.lerp(othervector, t)  // linear interpolation (0 <= t <= 1)
 vec.length()
+vec.lengthSquared()       // == vec.length()^2
 vec.unit()
 vec.normal()              // returns a 90 degree clockwise rotated vector
 vec.distanceTo(othervector)
+vec.distanceToSquared(othervector)  // == vec.distanceTo(othervector)^2
+vec.cross(othervector)    // 2D cross product: returns a scalar
 vec.equals(othervector)
+vec.min(othervector)        // returns a new vector with the minimum x and y values
+vec.max(othervector)        // returns a new vector with the maximum x and y values
 vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
 vec.toVector3D(z)         // convert to a vector3D by adding a z coordinate
 vec.angleDegrees()        // returns the angle of the vector: [1,0] = 0 degrees, [0, 1] = 90 degrees, etc

@@ -265,6 +265,11 @@ OpenJsCad.runMainInWorker = function(mainParameters)
     if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid.');
     OpenJsCad.log.prevLogTime = Date.now();    
     var csg = main(mainParameters);
+    if( (typeof(csg) == "object") && ((csg instanceof CAG)) )
+    {
+      // convert a 2D shape to a thin solid:
+      csg=csg.extrude({offset: [0,0,0.1]});
+    }
     if( (typeof(csg) != "object") || (!(csg instanceof CSG)) )
     {
       throw new Error("Your main() function should return a CSG solid.");
@@ -302,6 +307,11 @@ OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
   var f = new Function(workerscript);
   OpenJsCad.log.prevLogTime = Date.now();    
   var csg = f();
+  if( (typeof(csg) == "object") && ((csg instanceof CAG)) )
+  {
+    // convert a 2D shape to a thin solid:
+    csg=csg.extrude({offset: [0,0,0.1]});
+  }
   return csg;
 };
 
