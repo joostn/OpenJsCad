@@ -472,6 +472,10 @@ places the 2D solid onto the z=0 plane, and extrudes in the specified direction.
 twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
 The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
 between the bottom and top surface.
+<br><br>
+A 3D solid can be converted back to a 2D CAG using projectToOrthoNormalBasis(). This can be seen as the projection of the solid onto a plane
+using a distant light source; the result is a CAG representing the shadow of the object. The orthonormal basis is constructed from a plane
+and a right-hand vector (read more about orthonormal bases below).
 <pre>
 // Create a shape; argument is an array of 2D coordinates
 var shape1 = CAG.fromPoints([[0,0], [5,0], [3,5], [0,5]]);
@@ -497,7 +501,10 @@ var extruded=shape.extrude({
   twistangle: 30,       // top surface is rotated 30 degrees 
   twiststeps: 10        // create 10 slices
 });
-return extruded;  
+
+var cube2d = CSG.cube({radius: 10}).rotateZ(45);
+var z0basis = CSG.OrthoNormalBasis.Z0Plane();
+var cag = cube2d.projectToOrthoNormalBasis(z0basis);
 </pre>
 For an example of 2D shapes see the <a href="hookdemo.html">Parametric S hook</a> demo.
 
@@ -646,6 +653,9 @@ Or see the <a href="gearsdemo.html">Gears demo</a> for another example of intera
 An orthonormal basis can be used to convert 3D points to 2D points by projecting them onto a 3D plane.
 An orthonormal basis is constructed from a given plane. Optionally a 'right hand' vector can be given, this
 will become the x axis of the two dimensional plane. If no right hand vector is given, a random one is chosen.
+<br><br>
+CSG.OrthoNormalBasis.Z0Plane() creates an orthonormal basis for the z=0 plane. This transforms (xx,yy,zz) 3D coordinates
+into the 2D (xx, yy) coordinates, or vice versa from (xx, yy) into (xx, yy, 0).
 <br><br>
 Use to2D() and line3Dto2D() to convert from the 3D space to the 2D plane. Use to3D() and line2Dto3D()
 to convert the other way. 

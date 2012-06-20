@@ -1090,6 +1090,16 @@ CSG.prototype = {
     return this.transform(transformation);
   },
   
+  // project the 3D CSG onto a plane
+  // This returns a 2D CAG with the 'shadow' shape of the 3D solid when projected onto the
+  // plane represented by the orthonormal basis
+  projectToOrthoNormalBasis: function(orthobasis) {
+    var cags = this.polygons.map(function(polygon) {
+      return polygon.projectToOrthoNormalBasis(orthobasis);
+    });
+    var result = new CAG().union(cags);
+    return result;
+  },
 };
 
 // Parse an option from the options object
@@ -2317,6 +2327,26 @@ CSG.Polygon.prototype = {
       result += "  "+vertex.toString()+"\n";
     });
     return result;
+  },
+  
+  // project the 3D polygon onto a plane
+  projectToOrthoNormalBasis: function(orthobasis) {
+    var points2d = this.vertices.map(function(vertex){
+      return orthobasis.to2D(vertex.pos);
+    });
+    var result = CAG.fromPointsNoCheck(points2d);
+    var area = result.area();
+    if(Math.abs(area) < 1e-5)
+    {
+      // the polygon was perpendicular to the orthnormal plane. The resulting 2D polygon would be degenerate 
+      // return an empty area instead:
+      result = new CAG();
+    }
+    else if(area < 0)
+    {
+      result = result.flipped();
+    }
+    return result;
   },  
 };
 
@@ -3498,10 +3528,20 @@ CSG.OrthoNormalBasis = function (plane, rightvector) {
     // choose an arbitrary right hand vector, making sure it is somewhat orthogonal to the plane normal:
     rightvector = plane.normal.randomNonParallelVector();
   }
+  else
+  {
+    rightvector = new CSG.Vector3D(rightvector);
+  }
   this.v = plane.normal.cross(rightvector).unit();
   this.u = this.v.cross(plane.normal);
   this.plane = plane;
   this.planeorigin = plane.normal.times(plane.w);
+};
+
+// The z=0 plane, with the 3D x and y vectors mapped to the 2D x and y vector
+CSG.OrthoNormalBasis.Z0Plane = function() {
+  var plane = new CSG.Plane(new CSG.Vector3D([0,0,1]), 0);
+  return new CSG.OrthoNormalBasis(plane, new CSG.Vector3D([1, 0 ,0]));
 };
 
 CSG.OrthoNormalBasis.prototype = {
