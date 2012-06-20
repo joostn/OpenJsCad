@@ -420,11 +420,18 @@ var result = cube2.union(cube1);
 </pre>
 For a more complete example see the <a href="servodemo.html">Servo motor</a> demo.
 
-<h2>Determining the bounds of an object</h2>
+<h2>Determining the bounds of an object, lay object onto surface</h2>
 The getBounds() function can be used to retrieve the bounding box of an object.
 getBounds() returns
-an array with two elements specifying the minimum x,y,z coordinate and the maximum x,y,z coordinate:
-
+an array with two CSG.Vector3Ds specifying the minimum x,y,z coordinate and the maximum x,y,z coordinate.
+<br><br>
+lieFlat() lays an object onto the z=0 surface, in such a way that the z-height is minimized and it is centered around
+the z axis.
+This can be useful for CNC milling: it will transform a part of an object into the space 
+of the stock material during milling. Or for 3D printing: it is laid in such a way that it can be printed with
+minimal number of layers.
+Instead of lieFlat() the function getTransformationToFlatLying() can be used, which returns a CSG.Matrix4x4 for the 
+transformation.
 <pre>
 var cube1 = CSG.cube({radius: 10});
 var cube2 = CSG.cube({radius: 5});
@@ -435,7 +442,19 @@ var deltax = cube1.getBounds()[1].x - cube2.getBounds()[0].x;
 // align cube2 so it touches cube1:
 cube2  = cube2.translate([deltax, 0, 0]);
 
-return cube1.union(cube2);
+var cube3 = CSG.cube({radius: [100,120,10]});
+// do some random transformations:
+cube3 = cube3.rotateZ(31).rotateX(50).translate([30,50,20]);
+// now place onto the z=0 plane:
+cube3  = cube3.lieFlat();
+
+// or instead we could have used:
+var transformation = cube3.getTransformationToFlatLying();
+cube3 = cube3.transform(transformation);
+
+return cube3;
+
+
 </pre>
 
 <h2>2D shapes</h2>
