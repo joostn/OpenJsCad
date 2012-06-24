@@ -225,7 +225,13 @@ CSG.prototype = {
       var a = new CSG.Tree(this.polygons);
       var b = new CSG.Tree(csg.polygons);
       a.clipTo(b, false);
-      b.clipTo(a, true);    
+
+      // b.clipTo(a, true); // ERROR: this doesn't work
+      b.clipTo(a);
+      b.invert();
+      b.clipTo(a);
+      b.invert();      
+          
       var newpolygons = a.allPolygons().concat(b.allPolygons());
       var result = CSG.fromPolygons(newpolygons);
       result.properties = this.properties._merge(csg.properties);
@@ -1094,8 +1100,13 @@ CSG.prototype = {
   // This returns a 2D CAG with the 'shadow' shape of the 3D solid when projected onto the
   // plane represented by the orthonormal basis
   projectToOrthoNormalBasis: function(orthobasis) {
-    var cags = this.polygons.map(function(polygon) {
-      return polygon.projectToOrthoNormalBasis(orthobasis);
+    var cags = [];
+    this.polygons.map(function(polygon) {
+      var cag = polygon.projectToOrthoNormalBasis(orthobasis);
+      if(cag.sides.length > 0)
+      {
+        cags.push(cag);
+      }
     });
     var result = new CAG().union(cags);
     return result;
@@ -2803,7 +2814,7 @@ CSG.Node.prototype = {
     var frontnodes = [];
     var backnodes = [];
     polygontreenodes.map(function(polygontreenode){
-      polygontreenode.splitByPlane(_this.plane, _this.polygontreenodes, _this.polygontreenodes, frontnodes, backnodes);
+      polygontreenode.splitByPlane(_this.plane, _this.polygontreenodes, backnodes, frontnodes, backnodes);
     });
     if(frontnodes.length > 0)
     {
@@ -4232,7 +4243,7 @@ CSG.fuzzyCSGFactory.prototype = {
 };
 
 //////////////////////////////////////
-
+  
 // Tag factory: we can request a unique tag through CSG.getTag() 
 CSG.staticTag = 1;
 
@@ -4565,18 +4576,19 @@ CSG.Path2D.prototype = {
     var numpoints = this.points.length;
     var startindex = 0;
     if(this.closed && (numpoints > 2)) startindex = -1;
-    var prevpoint;
+    var prevvertex;
     for(var i=startindex; i < numpoints; i++)
     {
       var pointindex = i;
       if(pointindex < 0) pointindex = numpoints-1;
       var point = this.points[pointindex];
+      var vertex = new CAG.Vertex(point);
       if(i > startindex)
       {
-        var side = new CAG.Side(prevpoint, point);
+        var side = new CAG.Side(prevvertex, vertex);
         sides.push(side);
       }
-      prevpoint = point;
+      prevvertex = vertex;
     }    
     var shellcag = CAG.fromSides(sides);
     var expanded = shellcag.expandedShell(pathradius, resolution);
@@ -4666,11 +4678,13 @@ CAG.fromPoints = function(points) {
   if(numpoints < 3) throw new Error("CAG shape needs at least 3 points");
   var sides = [];
   var prevpoint = new CSG.Vector2D(points[numpoints-1]);
+  var prevvertex = new CAG.Vertex(prevpoint);
   points.map(function(p){
     var point = new CSG.Vector2D(p);
-    var side = new CAG.Side(prevpoint, point);
+    var vertex = new CAG.Vertex(point);
+    var side = new CAG.Side(prevvertex, vertex);
     sides.push(side);
-    prevpoint = point;  
+    prevvertex = vertex;  
   });
   var result = CAG.fromSides(sides);
   if(result.isSelfIntersecting())
@@ -4686,6 +4700,7 @@ CAG.fromPoints = function(points) {
   {
     result = result.flipped();
   }
+  result = result.canonicalized();
   return result;
 };
 
@@ -4694,11 +4709,13 @@ CAG.fromPoints = function(points) {
 CAG.fromPointsNoCheck = function(points) {
   var sides = [];
   var prevpoint = new CSG.Vector2D(points[points.length-1]);
+  var prevvertex = new CAG.Vertex(prevpoint);
   points.map(function(p){
     var point = new CSG.Vector2D(p);
-    var side = new CAG.Side(prevpoint, point);
+    var vertex = new CAG.Vertex(point);
+    var side = new CAG.Side(prevvertex, vertex);
     sides.push(side);
-    prevpoint = point;  
+    prevvertex = vertex;  
   });
   return CAG.fromSides(sides);
 };
@@ -4715,11 +4732,23 @@ CAG.fromFakeCSG = function(csg) {
 // see if the line between p0start and p0end intersects with the line between p1start and p1end
 // returns true if the lines strictly intersect, the end points are not counted!
 CAG.linesIntersect = function(p0start, p0end, p1start, p1end) {
-  var d0 = p0end.minus(p0start);
-  var d1 = p1end.minus(p1start);
-  if(Math.abs(d0.cross(d1)) < 1e-9) return false; // lines are parallel 
-  var alphas = CSG.solve2Linear(-d0.x, d1.x, -d0.y, d1.y, p0start.x-p1start.x, p0start.y-p1start.y);
-  if( (alphas[0] > 1e-6) && (alphas[0] < 0.999999) && (alphas[1] > 1e-5) && (alphas[1] < 0.999999) ) return true; 
+  if(p0end.equals(p1start) || p1end.equals(p0start) )
+  {
+    var d=p1end.minus(p1start).unit().plus(p0end.minus(p0start).unit()).length();
+    if(d < 1e-5)
+    {
+      return true;
+    }
+  }
+  else
+  { 
+    var d0 = p0end.minus(p0start);
+    var d1 = p1end.minus(p1start);
+    if(Math.abs(d0.cross(d1)) < 1e-9) return false; // lines are parallel 
+    var alphas = CSG.solve2Linear(-d0.x, d1.x, -d0.y, d1.y, p0start.x-p1start.x, p0start.y-p1start.y);
+    if( (alphas[0] > 1e-6) && (alphas[0] < 0.999999) && (alphas[1] > 1e-5) && (alphas[1] < 0.999999) ) return true;
+//    if( (alphas[0] >= 0) && (alphas[0] <= 1) && (alphas[1] >= 0) && (alphas[1] <= 1) ) return true;
+   } 
   return false;
 };
 
@@ -4736,16 +4765,17 @@ CAG.circle = function(options) {
   var radius = CSG.parseOptionAsFloat(options, "radius", 1);
   var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution2D);
   var sides = [];
-  var prevpoint;
+  var prevvertex;
   for(var i = 0; i <= resolution; i++)
   {
     var radians = 2 * Math.PI * i / resolution;
     var point = CSG.Vector2D.fromAngleRadians(radians).times(radius).plus(center);
+    var vertex = new CAG.Vertex(point);
     if(i > 0)
     {
-      sides.push(new CAG.Side(prevpoint,point));
+      sides.push(new CAG.Side(prevvertex,vertex));
     }
-    prevpoint = point; 
+    prevvertex = vertex; 
   }
   return CAG.fromSides(sides);
 };
@@ -4810,6 +4840,29 @@ CAG.prototype = {
     });
     return CSG.fromPolygons(polygons);
   },
+  
+  toDebugString1: function() {
+    this.sides.sort(function(a,b){
+      return a.vertex0.pos.x - b.vertex0.pos.x; 
+    });
+    var str = "";
+    this.sides.map(function(side) {
+      str += "("+side.vertex0.pos.x+","+side.vertex0.pos.y+") - ("+side.vertex1.pos.x+","+side.vertex1.pos.y+")\n";
+    });
+    return str;
+  },
+
+  toDebugString: function() {
+//    this.sides.sort(function(a,b){
+//      return a.vertex0.pos.x - b.vertex0.pos.x; 
+//    });
+    var str = "CAG.fromSides([\n";
+    this.sides.map(function(side) {
+      str += "  new CAG.Side(new CAG.Vertex(new CSG.Vector2D("+side.vertex0.pos.x+","+side.vertex0.pos.y+")), new CAG.Vertex(new CSG.Vector2D("+side.vertex1.pos.x+","+side.vertex1.pos.y+"))),\n";
+    });
+    str += "]);\n";
+    return str;
+  },
 
   union: function(cag) {
     var cags;
@@ -4821,11 +4874,15 @@ CAG.prototype = {
     {
       cags = [cag];
     }
-    var csgs = cags.map(function(cag){
-      return cag.toCSG(-1, 1);
-    });    
-    var r = this.toCSG(-1, 1).union(csgs);
-    return CAG.fromFakeCSG(r);
+    var r = this.toCSG(-1, 1);
+    cags.map(function(cag){
+      r = r.unionSub(cag.toCSG(-1, 1), false, false);
+    });
+    r = r.reTesselated();              
+    r = r.canonicalized();
+    var cag = CAG.fromFakeCSG(r);
+    var cag_canonicalized = cag.canonicalized();
+    return cag_canonicalized;
   },
   
   subtract: function(cag) {
@@ -4838,11 +4895,15 @@ CAG.prototype = {
     {
       cags = [cag];
     }
-    var csgs = cags.map(function(cag){
-      return cag.toCSG(-1, 1);
+    var r = this.toCSG(-1, 1);
+    cags.map(function(cag){
+      r = r.subtractSub(cag.toCSG(-1, 1), false, false);
     });    
-    var r = this.toCSG(-1, 1).subtract(csgs);
-    return CAG.fromFakeCSG(r);
+    r = r.reTesselated();              
+    r = r.canonicalized();
+    r = CAG.fromFakeCSG(r);
+    r = r.canonicalized();
+    return r;
   },
   
   intersect: function(cag) {
@@ -4855,11 +4916,15 @@ CAG.prototype = {
     {
       cags = [cag];
     }
-    var csgs = cags.map(function(cag){
-      return cag.toCSG(-1, 1);
+    var r = this.toCSG(-1, 1);
+    cags.map(function(cag){
+      r = r.intersectSub(cag.toCSG(-1, 1), false, false);
     });    
-    var r = this.toCSG(-1, 1).intersect(csgs);
-    return CAG.fromFakeCSG(r);
+    r = r.reTesselated();              
+    r = r.canonicalized();
+    r = CAG.fromFakeCSG(r);
+    r = r.canonicalized();
+    return r;
   },
   
   transform: function(matrix4x4) {
@@ -4880,7 +4945,7 @@ CAG.prototype = {
   area: function() {
     var polygonArea = 0;
     this.sides.map(function(side){
-      polygonArea += side.p1.cross(side.p2); 
+      polygonArea += side.vertex0.pos.cross(side.vertex1.pos); 
     });
     polygonArea *= 0.5; 
     return polygonArea; 
@@ -4902,14 +4967,14 @@ CAG.prototype = {
     }
     else
     {
-      minpoint=this.sides[0].p1;
+      minpoint=this.sides[0].vertex0.pos;
     }
     var maxpoint=minpoint;
     this.sides.map(function(side){
-      minpoint = minpoint.min(side.p1);
-      minpoint = minpoint.min(side.p2);
-      maxpoint = maxpoint.max(side.p1);
-      maxpoint = maxpoint.max(side.p2);
+      minpoint = minpoint.min(side.vertex0.pos);
+      minpoint = minpoint.min(side.vertex1.pos);
+      maxpoint = maxpoint.max(side.vertex0.pos);
+      maxpoint = maxpoint.max(side.vertex1.pos);
     });
     return [minpoint, maxpoint];  
   },
@@ -4922,7 +4987,7 @@ CAG.prototype = {
       for(var ii = i+1; ii < numsides; ii++)
       {
         var side1 = this.sides[ii];
-        if(CAG.linesIntersect(side0.p1, side0.p2, side1.p1, side1.p2))
+        if(CAG.linesIntersect(side0.vertex0.pos, side0.vertex1.pos, side1.vertex0.pos, side1.vertex1.pos))
         {
           return true;
         } 
@@ -4933,30 +4998,40 @@ CAG.prototype = {
   
   expandedShell: function(radius, resolution) {
     resolution = resolution || 8;
+    if(resolution < 4) resolution = 4;
     var cags = [];
     var pointmap = {};
-    this.sides.map(function(side){
-      var normal = side.p2.minus(side.p1).normal().unit().times(radius);
-      var shellpoints = [
-        side.p2.plus(normal),
-        side.p2.minus(normal),
-        side.p1.minus(normal),
-        side.p1.plus(normal)
-      ];
-      cags.push(CAG.fromPointsNoCheck(shellpoints));
-      for(var step = 0; step < 2; step++)
+    var cag = this.canonicalized();
+    cag.sides.map(function(side){
+      var d = side.vertex1.pos.minus(side.vertex0.pos);
+      var dl = d.length();
+      if(dl > 1e-5)
       {
-        var p1 = (step == 0)? side.p1 : side.p2;
-        var p2 = (step == 0)? side.p2 : side.p1;
-        var tag = p1.x + " " + p1.y;
-        if(! (tag in pointmap))
+        d = d.times(1.0 / dl);
+        var normal = d.normal().times(radius);
+        var shellpoints = [
+          side.vertex1.pos.plus(normal),
+          side.vertex1.pos.minus(normal),
+          side.vertex0.pos.minus(normal),
+          side.vertex0.pos.plus(normal)
+        ];
+  //      var newcag = CAG.fromPointsNoCheck(shellpoints); 
+        var newcag = CAG.fromPoints(shellpoints); 
+        cags.push(newcag);
+        for(var step = 0; step < 2; step++)
         {
-          pointmap[tag] = [];
+          var p1 = (step == 0)? side.vertex0.pos : side.vertex1.pos;
+          var p2 = (step == 0)? side.vertex1.pos : side.vertex0.pos;
+          var tag = p1.x + " " + p1.y;
+          if(! (tag in pointmap))
+          {
+            pointmap[tag] = [];
+          }
+          pointmap[tag].push({
+            "p1": p1,
+            "p2": p2,
+          });
         }
-        pointmap[tag].push({
-          "p1": p1,
-          "p2": p2,
-        });
       }
     });
     for(var tag in pointmap)
@@ -4986,23 +5061,33 @@ CAG.prototype = {
         angle1 = 0;
         angle2 = 360;
       }
-      if(angle2 > angle1)
+      var fullcircle=(angle2 > angle1+359.999);
+      if(fullcircle)
       {
+        angle1 = 0;
+        angle2 = 360;
+      }
+      if(angle2 > (angle1+1e-5))
+      {
+        var points = [];
+        if(!fullcircle)
+        {
+          points.push(pcenter);
+        }
         var numsteps = Math.round(resolution*(angle2-angle1)/360);
         if(numsteps < 1) numsteps = 1;
-        var prevpoint = pcenter;
-        var sides = [];
         for(var step = 0; step <= numsteps; step++)
         {
           var angle = angle1 + step/numsteps*(angle2 - angle1);
           if(step == numsteps) angle = angle2; // prevent rounding errors
-          if(step == 0) angle = angle1;
           var point = pcenter.plus(CSG.Vector2D.fromAngleDegrees(angle).times(radius));
-          sides.push(new CAG.Side(prevpoint, point));
-          prevpoint = point;
+          if( (!fullcircle) || (step > 0) )
+          {
+            points.push(point);
+          }
         }
-        sides.push(new CAG.Side(prevpoint, pcenter));
-        cags.push(CAG.fromSides(sides));
+        var newcag = CAG.fromPointsNoCheck(points);
+        cags.push(newcag);
       }
     }
     var result = new CAG();
@@ -5085,14 +5170,14 @@ CAG.prototype = {
           var thisside = transformedcag.sides[sideindex];
           var prevside = prevtransformedcag.sides[sideindex];
           var p1 = new CSG.Polygon([
-            new CSG.Vertex(thisside.p2.toVector3D(stepz)),
-            new CSG.Vertex(thisside.p1.toVector3D(stepz)),
-            new CSG.Vertex(prevside.p1.toVector3D(prevstepz))
+            new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
+            new CSG.Vertex(thisside.vertex0.pos.toVector3D(stepz)),
+            new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz))
           ]);          
           var p2 = new CSG.Polygon([
-            new CSG.Vertex(thisside.p2.toVector3D(stepz)),
-            new CSG.Vertex(prevside.p1.toVector3D(prevstepz)),
-            new CSG.Vertex(prevside.p2.toVector3D(prevstepz))
+            new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
+            new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz)),
+            new CSG.Vertex(prevside.vertex1.pos.toVector3D(prevstepz))
           ]);
           if(offsetvector.z < 0)
           {
@@ -5107,12 +5192,84 @@ CAG.prototype = {
       prevstepz = stepz;
     }  // for step  
     return CSG.fromPolygons(newpolygons);
-  }  
+  },
+  
+  // check if we are a valid CAG (for debugging)
+  check: function() {
+    var errors = [];
+    if(this.isSelfIntersecting())
+    {
+      errors.push("Self intersects");
+    }
+    var pointcount = {};
+    this.sides.map(function(side){
+      function mappoint(p) {
+        var tag = p.x+" "+p.y;
+        if(!(tag in pointcount)) pointcount[tag]=0;
+        pointcount[tag]++;
+      }
+      mappoint(side.vertex0.pos);
+      mappoint(side.vertex1.pos);
+    });
+    for(var tag in pointcount)
+    {
+      var count = pointcount[tag];
+      if(count & 1)
+      {
+        errors.push("Uneven number of sides ("+count+") for point "+tag);
+      }
+    }
+    var area = this.area();
+    if(area < 1e-5)
+    {
+      errors.push("Area is "+area);
+    }
+    if(errors.length > 0)
+    {
+      var ertxt = "";
+      errors.map(function(err){
+        ertxt += err+"\n";
+      });
+      throw new Error(ertxt); 
+    }
+  },
+  
+  canonicalized: function() {
+    if(this.isCanonicalized)
+    {
+      return this;
+    }
+    else
+    {
+      var factory = new CAG.fuzzyCAGFactory();
+      var result = factory.getCAG(this);
+      result.isCanonicalized = true;
+      return result;
+    }
+  },  
 };
 
-CAG.Side = function(p1, p2) {
-  this.p1 = p1;
-  this.p2 = p2;
+CAG.Vertex = function(pos) {
+  this.pos = pos;
+};
+
+CAG.Vertex.prototype = {
+  getTag: function() {
+    var result = this.tag;
+    if(!result)
+    {
+      result = CSG.getTag();
+      this.tag = result;
+    }
+    return result;
+  },
+};
+
+CAG.Side = function(vertex0, vertex1) {
+  if(!(vertex0 instanceof CAG.Vertex)) throw new Error("Assertion failed");
+  if(!(vertex1 instanceof CAG.Vertex)) throw new Error("Assertion failed");
+  this.vertex0 = vertex0; 
+  this.vertex1 = vertex1;
 };
 
 CAG.Side.fromFakePolygon = function(polygon) {
@@ -5122,6 +5279,16 @@ CAG.Side.fromFakePolygon = function(polygon) {
   for(var i=0; i < 4; i++)
   {
     var pos=polygon.vertices[i].pos;
+    if( (pos.z >= -1.001) && (pos.z < -0.999))
+    {
+    }
+    else if( (pos.z >= 0.999) && (pos.z < 1.001))
+    {
+    }
+    else
+    {
+      throw new Error("Assertion failed");
+    }
     if(pos.z > 0)
     {
       pointsZeroZ.push(new CSG.Vector2D(pos.x, pos.y));
@@ -5142,36 +5309,68 @@ CAG.Side.fromFakePolygon = function(polygon) {
     p2 = pointsZeroZ[1];
   }
   else throw new Error("Assertion failed");
-  var result = new CAG.Side(p1, p2);
+  var result = new CAG.Side(new CAG.Vertex(p1), new CAG.Vertex(p2));
   return result;
 };
 
 CAG.Side.prototype = {
   toString: function() {
-    return "("+this.p1.x+","+this.p1.y+") -> ("+this.p2.x+","+this.p2.y+")";
-//    return "("+Math.round(this.p1.x*10)/10+","+Math.round(this.p1.y*10)/10+") -> ("+Math.round(this.p2.x*10)/10+","+Math.round(this.p2.y*10)/10+")";
+    return "("+this.vertex0.pos.x+","+this.vertex0.pos.y+") -> ("+this.vertex1.pos.x+","+this.vertex1.pos.y+")";
+//    return "("+Math.round(this.vertex0.pos.x*10)/10+","+Math.round(this.vertex0.pos.y*10)/10+") -> ("+Math.round(this.vertex1.pos.x*10)/10+","+Math.round(this.vertex1.pos.y*10)/10+")";
   },
   
   toPolygon3D: function(z0, z1) {
     var vertices=[
-      new CSG.Vertex(this.p1.toVector3D(z0)),
-      new CSG.Vertex(this.p2.toVector3D(z0)),
-      new CSG.Vertex(this.p2.toVector3D(z1)),
-      new CSG.Vertex(this.p1.toVector3D(z1)),
+      new CSG.Vertex(this.vertex0.pos.toVector3D(z0)),
+      new CSG.Vertex(this.vertex1.pos.toVector3D(z0)),
+      new CSG.Vertex(this.vertex1.pos.toVector3D(z1)),
+      new CSG.Vertex(this.vertex0.pos.toVector3D(z1)),
     ];
     return new CSG.Polygon(vertices);
   },
   
   transform: function(matrix4x4) {
-    var newp1 = this.p1.transform(matrix4x4);
-    var newp2 = this.p2.transform(matrix4x4);
-    return new CAG.Side(newp1, newp2);
+    var newp1 = this.vertex0.pos.transform(matrix4x4);
+    var newp2 = this.vertex1.pos.transform(matrix4x4);
+    return new CAG.Side(new CAG.Vertex(newp1), new CAG.Vertex(newp2));
   },
   
   flipped: function() {
-    return new CAG.Side(this.p2, this.p1);
+    return new CAG.Side(this.vertex1, this.vertex0);
   },
 };
+
+//////////////////////////////////////
+
+CAG.fuzzyCAGFactory = function() {
+  this.vertexfactory = new CSG.fuzzyFactory(2, 1e-5);
+};
+
+CAG.fuzzyCAGFactory.prototype = {
+  getVertex: function(sourcevertex) {
+    var elements = [sourcevertex.pos._x, sourcevertex.pos._y]; 
+    var result = this.vertexfactory.lookupOrCreate(elements, function(els) {
+      return sourcevertex;
+    });
+    return result;
+  },
+
+  getSide: function(sourceside) {
+    var vertex0 = this.getVertex(sourceside.vertex0);
+    var vertex1 = this.getVertex(sourceside.vertex1);
+    return new CAG.Side(vertex0, vertex1);
+  },
+  
+  getCAG: function(sourcecag) {
+    var _this = this;
+    var newsides = sourcecag.sides.map(function(side) {
+      return _this.getSide(side);
+    });
+    return CAG.fromSides(newsides);
+  },
+};
+
+//////////////////////////////////////
 
 CSG.addTransformationMethodsToPrototype(CSG.prototype);
 CSG.addTransformationMethodsToPrototype(CSG.Vector2D.prototype);
