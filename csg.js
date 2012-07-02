@@ -118,6 +118,7 @@ CSG.fromObject = function(obj) {
 
 // Reconstruct a CSG from the output of toCompactBinary()
 CSG.fromCompactBinary = function(bin) {
+  if(bin.class != "CSG") throw new Error("Not a CSG");
   var planes = [];
   var planeData = bin.planeData;
   var numplanes = planeData.length / 4;
@@ -830,6 +831,10 @@ CSG.prototype = {
   
   // Cut the solid by a plane. Returns the solid on the back side of the plane
   cutByPlane: function(plane) {
+    if(this.polygons.length == 0)
+    {
+      return new CSG();
+    }  
     // Ideally we would like to do an intersection with a polygon of inifinite size
     // but this is not supported by our implementation. As a workaround, we will create
     // a cube, with one face on the plane, and a size larger enough so that the entire
@@ -971,6 +976,7 @@ CSG.prototype = {
       planeData[planesArrayIndex++] = p.w;
     });
     var result = {
+      class: "CSG",
       numPolygons: numpolygons,
       numVerticesPerPolygon: numVerticesPerPolygon,
       polygonPlaneIndexes: polygonPlaneIndexes,
@@ -1110,6 +1116,16 @@ CSG.prototype = {
     });
     var result = new CAG().union(cags);
     return result;
+  },
+  
+  sectionCut: function(orthobasis) {
+    var plane1 = orthobasis.plane;
+    var plane2 = orthobasis.plane.flipped();
+    plane1 = new CSG.Plane(plane1.normal, plane1.w + 1e-4); 
+    plane2 = new CSG.Plane(plane2.normal, plane2.w + 1e-4); 
+    var cut3d = this.cutByPlane(plane1);
+    cut3d = cut3d.cutByPlane(plane2);
+    return cut3d.projectToOrthoNormalBasis(orthobasis);
   },
 };
 
@@ -2358,7 +2374,8 @@ CSG.Polygon.prototype = {
       result = result.flipped();
     }
     return result;
-  },  
+  },
+  
 };
 
 CSG.Polygon.verticesConvex = function(vertices, planenormal) {
@@ -4825,6 +4842,37 @@ CAG.roundedRectangle = function(options) {
   return rect;
 };
 
+// Reconstruct a CAG from the output of toCompactBinary()
+CAG.fromCompactBinary = function(bin) {
+  if(bin.class != "CAG") throw new Error("Not a CAG");
+  var vertices = [];
+  var vertexData = bin.vertexData;
+  var numvertices = vertexData.length / 2;
+  var arrayindex = 0;
+  for(var vertexindex = 0; vertexindex < numvertices; vertexindex++)
+  {
+    var x = vertexData[arrayindex++];
+    var y = vertexData[arrayindex++];
+    var pos = new CSG.Vector2D(x,y);
+    var vertex = new CAG.Vertex(pos);
+    vertices.push(vertex);
+  }
+
+  var sides = [];
+  var numsides = bin.sideVertexIndices.length / 2;
+  arrayindex = 0;
+  for(var sideindex = 0; sideindex < numsides; sideindex++)
+  {
+    var vertexindex0 = bin.sideVertexIndices[arrayindex++];
+    var vertexindex1 = bin.sideVertexIndices[arrayindex++];
+    var side = new CAG.Side(vertices[vertexindex0], vertices[vertexindex1]);
+    sides.push(side); 
+  }
+  var cag = CAG.fromSides(sides);
+  cag.isCanonicalized = true;
+  return cag;
+};
+
 CAG.prototype = {
   toString: function() {
     var result = "CAG ("+this.sides.length+" sides):\n";
@@ -4963,7 +5011,7 @@ CAG.prototype = {
     var minpoint;
     if(this.sides.length == 0)
     {
-      minpoint = new CSG.Vector2D();
+      minpoint = new CSG.Vector2D(0,0);
     }
     else
     {
@@ -5112,6 +5160,11 @@ CAG.prototype = {
   // twiststeps determines the resolution of the twist (should be >= 1)  
   // returns a CSG object
   extrude: function(options) {
+    if(this.sides.length == 0)
+    {
+      // empty!
+      return new CSG();
+    }
     var offsetvector = CSG.parseOptionAs3DVector(options, "offset", [0,0,1]);
     var twistangle = CSG.parseOptionAsFloat(options, "twistangle", 0);
     var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", 10);
@@ -5246,7 +5299,151 @@ CAG.prototype = {
       result.isCanonicalized = true;
       return result;
     }
-  },  
+  },
+  
+  toCompactBinary: function() {
+    var cag = this.canonicalized();
+    var numsides = cag.sides.length;
+    var vertexmap = {};
+    var vertices = [];
+    var numvertices = 0;
+    var sideVertexIndices = new Uint32Array(2*numsides);
+    var sidevertexindicesindex = 0;
+    cag.sides.map(function(side){
+      [side.vertex0, side.vertex1].map(function(v){
+        var vertextag = v.getTag();
+        var vertexindex;
+        if(! (vertextag in vertexmap))
+        {
+          vertexindex = numvertices++; 
+          vertexmap[vertextag] = vertexindex;
+          vertices.push(v);
+        }
+        else
+        {
+          vertexindex = vertexmap[vertextag];
+        }
+        sideVertexIndices[sidevertexindicesindex++] = vertexindex;
+      });
+    });
+    var vertexData = new Float64Array(numvertices * 2);
+    var verticesArrayIndex = 0;
+    vertices.map(function(v){
+      var pos = v.pos;
+      vertexData[verticesArrayIndex++] = pos._x; 
+      vertexData[verticesArrayIndex++] = pos._y; 
+    });
+    var result = {
+      class: "CAG",
+      sideVertexIndices: sideVertexIndices,
+      vertexData: vertexData,
+    };
+    return result;
+  },
+  
+  getOutlinePaths: function() {
+    var cag = this.canonicalized();
+    var sideTagToSideMap = {};
+    var startVertexTagToSideTagMap = {};
+    cag.sides.map(function(side) {
+      var sidetag = side.getTag();
+      sideTagToSideMap[sidetag] = side;
+      var startvertextag = side.vertex0.getTag();
+      if(!(startvertextag in startVertexTagToSideTagMap))
+      {
+        startVertexTagToSideTagMap[startvertextag] = [];
+      }
+      startVertexTagToSideTagMap[startvertextag].push(sidetag);
+    });
+    var paths = [];
+    while(true)
+    {
+      var startsidetag = null;
+      for(var aVertexTag in startVertexTagToSideTagMap)
+      {
+        var sidesForThisVertex = startVertexTagToSideTagMap[aVertexTag];
+        startsidetag = sidesForThisVertex[0];
+        sidesForThisVertex.splice(0,1);
+        if(sidesForThisVertex.length == 0)
+        {
+          delete startVertexTagToSideTagMap[aVertexTag];
+        }
+        break;
+      }
+      if(startsidetag === null) break;  // we've had all sides
+      var connectedVertexPoints = [];
+      var sidetag = startsidetag;
+      var thisside = sideTagToSideMap[sidetag];
+      var startvertextag = thisside.vertex0.getTag();
+      while(true)
+      {
+        connectedVertexPoints.push(thisside.vertex0.pos);
+        var nextvertextag = thisside.vertex1.getTag();
+        if(nextvertextag == startvertextag) break; // we've closed the polygon
+        if(!(nextvertextag in startVertexTagToSideTagMap))
+        {
+          throw new Error("Area is not closed!");
+        }
+        var nextpossiblesidetags = startVertexTagToSideTagMap[nextvertextag];
+        var nextsideindex = -1;
+        if(nextpossiblesidetags.length == 1)
+        {
+          nextsideindex = 0;
+        }
+        else
+        {
+          // more than one side starting at the same vertex. This means we have
+          // two shapes touching at the same corner
+          var bestangle = null;
+          var thisangle = thisside.direction().angleDegrees();
+          for(var sideindex = 0; sideindex < nextpossiblesidetags.length; sideindex++)
+          {
+            var nextpossiblesidetag = nextpossiblesidetags[sideindex];
+            var possibleside = sideTagToSideMap[nextpossiblesidetag];
+            var angle = possibleside.direction().angleDegrees();
+            var angledif = angle - thisangle;
+            if(angledif < -180) angledif += 360;
+            if(angledif >= 180) angledif -= 360;
+            if( (nextsideindex < 0) || (angledif > bestangle) )
+            {
+              nextsideindex = sideindex;
+              bestangle = angledif;
+            }
+          }
+        }
+        var nextsidetag = nextpossiblesidetags[nextsideindex];
+        nextpossiblesidetags.splice(nextsideindex,1);
+        if(nextpossiblesidetags.length == 0)
+        {
+          delete startVertexTagToSideTagMap[nextvertextag];
+        }
+        thisside = sideTagToSideMap[nextsidetag];
+      } // inner loop
+      var path = new CSG.Path2D(connectedVertexPoints, true);
+      paths.push(path);
+    } // outer loop
+    return paths;
+  },
+  
+  toDxf: function(blobbuilder) {
+    var paths = this.getOutlinePaths();
+    return CAG.PathsToDxf(paths, blobbuilder);
+  },
+    
+};
+
+CAG.PathsToDxf = function(paths, blobbuilder) {
+  var str = "999\nDXF generated by OpenJsCad\n  0\nSECTION\n  2\nENTITIES\n";
+  blobbuilder.append(str);
+  paths.map(function(path) {
+    str = "  0\nLWPOLYLINE\n  90\n"+path.points.length+"\n  70\n"+(path.closed? 1:0)+"\n";
+    path.points.map(function(point) {
+      str += " 10\n"+point.x+"\n 20\n"+point.y+"\n 30\n0.0\n"; 
+    });
+    blobbuilder.append(str);
+  });
+  str = "  0\nENDSEC\n  0\nEOF\n";
+  blobbuilder.append(str);
 };
 
 CAG.Vertex = function(pos) {
@@ -5338,6 +5535,20 @@ CAG.Side.prototype = {
   flipped: function() {
     return new CAG.Side(this.vertex1, this.vertex0);
   },
+
+  direction: function() {
+    return this.vertex1.pos.minus(this.vertex0.pos);
+  },
+  
+  getTag: function() {
+    var result = this.tag;
+    if(!result)
+    {
+      result = CSG.getTag();
+      this.tag = result;
+    }
+    return result;
+  },  
 };
 
 //////////////////////////////////////

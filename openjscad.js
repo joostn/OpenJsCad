@@ -262,21 +262,16 @@ OpenJsCad.runMainInWorker = function(mainParameters)
 {
   try
   {
-    if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid.');
+    if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid or a CAG area.');
     OpenJsCad.log.prevLogTime = Date.now();    
-    var csg = main(mainParameters);
-    if( (typeof(csg) == "object") && ((csg instanceof CAG)) )
+    var result = main(mainParameters);
+    if( (typeof(result) != "object") || ((!(result instanceof CSG)) && (!(result instanceof CAG))))
     {
-      // convert a 2D shape to a thin solid:
-      csg=csg.extrude({offset: [0,0,0.1]});
+      throw new Error("Your main() function should return a CSG solid or a CAG area.");
     }
-    if( (typeof(csg) != "object") || (!(csg instanceof CSG)) )
-    {
-      throw new Error("Your main() function should return a CSG solid.");
-    }
-    var csg_bin = csg.toCompactBinary();
-    csg = null; // not needed anymore
-    self.postMessage({cmd: 'rendered', csg: csg_bin});
+    var result_compact = result.toCompactBinary();
+    result = null; // not needed anymore
+    self.postMessage({cmd: 'rendered', result: result_compact});
   }
   catch(e)
   {
@@ -289,7 +284,7 @@ OpenJsCad.runMainInWorker = function(mainParameters)
   }
 };
 
-OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
+OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
   var workerscript = "";
   workerscript += script;
   if(debugging)
@@ -306,17 +301,12 @@ OpenJsCad.javaScriptToSolidSync = function(script, mainParameters, debugging) {
   workerscript += "return main("+JSON.stringify(mainParameters)+");";  
   var f = new Function(workerscript);
   OpenJsCad.log.prevLogTime = Date.now();    
-  var csg = f();
-  if( (typeof(csg) == "object") && ((csg instanceof CAG)) )
-  {
-    // convert a 2D shape to a thin solid:
-    csg=csg.extrude({offset: [0,0,0.1]});
-  }
-  return csg;
+  var obj = f();
+  return obj;
 };
 
 // callback: should be function(error, csg)
-OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, callback) {
+OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, callback) {
   var baselibraries = [
     "csg.js",
     "openjscad.js"
@@ -347,13 +337,24 @@ OpenJsCad.javaScriptToSolidASync = function(script, mainParameters, callback) {
     { 
       if(e.data.cmd == 'rendered')
       {
-        //var csg = CSG.fromObject(e.data.csg);
-        var csg = CSG.fromCompactBinary(e.data.csg);
-        callback(null, csg);
+        var resulttype = e.data.result.class;
+        var result;
+        if(resulttype == "CSG")
+        {
+          result = CSG.fromCompactBinary(e.data.result);
+        }
+        else if(resulttype == "CAG")
+        {
+          result = CAG.fromCompactBinary(e.data.result);
+        }
+        else
+        {
+          throw new Error("Cannot parse result");
+        }
+        callback(null, result);
       }
       else if(e.data.cmd == "error")
       {
-//        var errtxt = "Error in line "+e.data.err.lineno+": "+e.data.err.message;
         callback(e.data.err, null);
       }
       else if(e.data.cmd == "log")
@@ -476,9 +477,9 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.viewerheight = 600;
   this.initialViewerDistance = 50;
   this.processing = false;
-  this.solid = null;
-  this.validcsg = false;
-  this.hasstl = false;
+  this.currentObject = null;
+  this.hasValidCurrentObject = false;
+  this.hasOutputFile = false;
   this.worker = null;
   this.paramDefinitions = [];
   this.paramControls = [];
@@ -486,6 +487,23 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.hasError = false;
   this.debugging = false;
   this.createElements();
+};
+
+OpenJsCad.Processor.convertToSolid = function(obj) {
+  if( (typeof(obj) == "object") && ((obj instanceof CAG)) )
+  {
+    // convert a 2D shape to a thin solid:
+    obj=obj.extrude({offset: [0,0,0.1]});
+  }
+  else if( (typeof(obj) == "object") && ((obj instanceof CSG)) )
+  {
+    // obj already is a solid
+  }
+  else
+  {
+    throw new Error("Cannot convert to solid");
+  }
+  return obj;
 };
 
 OpenJsCad.Processor.prototype = {
@@ -533,16 +551,13 @@ OpenJsCad.Processor.prototype = {
       that.abort();
     };
     this.statusbuttons.appendChild(this.abortbutton);
-    this.generateStlButton = document.createElement("button");
-    this.generateStlButton.innerHTML = "Generate STL";
-    this.generateStlButton.onclick = function(e) {
-      that.generateStl();
+    this.generateOutputFileButton = document.createElement("button");
+    this.generateOutputFileButton.onclick = function(e) {
+      that.generateOutputFile();
     };
-    this.statusbuttons.appendChild(this.generateStlButton);
-    this.downloadStlLink = document.createElement("a");
-    this.downloadStlLink.innerHTML = "Download STL";
-//    this.downloadStlLink.type = "application/sla";  // mime type for .stl files
-    this.statusbuttons.appendChild(this.downloadStlLink);
+    this.statusbuttons.appendChild(this.generateOutputFileButton);
+    this.downloadOutputFileLink = document.createElement("a");
+    this.statusbuttons.appendChild(this.downloadOutputFileLink);
     this.parametersdiv = document.createElement("div");
     this.parametersdiv.className = "parametersdiv";
     var headerdiv = document.createElement("div");
@@ -565,14 +580,22 @@ OpenJsCad.Processor.prototype = {
     this.clearViewer();
   },
   
-  clearViewer: function() {
-    this.clearStl();
-    this.solid = new CSG();
+  setCurrentObject: function(obj) {
+    this.currentObject = obj;
     if(this.viewer)
     {
-      this.viewer.setCsg(this.solid);
+      var csg = OpenJsCad.Processor.convertToSolid(obj); 
+      this.viewer.setCsg(csg);
     }
-    this.validcsg = false;
+    this.hasValidCurrentObject = true;
+    var ext = this.extensionForCurrentObject();
+    this.generateOutputFileButton.innerHTML = "Generate "+ext.toUpperCase();
+  },
+  
+  clearViewer: function() {
+    this.clearOutputFile();
+    this.setCurrentObject(new CSG());
+    this.hasValidCurrentObject = false;
     this.enableItems();
   },
   
@@ -590,8 +613,8 @@ OpenJsCad.Processor.prototype = {
   
   enableItems: function() {
     this.abortbutton.style.display = this.processing? "inline":"none";
-    this.generateStlButton.style.display = ((!this.hasstl)&&(this.validcsg))? "inline":"none";
-    this.downloadStlLink.style.display = this.hasstl? "inline":"none";
+    this.generateOutputFileButton.style.display = ((!this.hasOutputFile)&&(this.hasValidCurrentObject))? "inline":"none";
+    this.downloadOutputFileLink.style.display = this.hasOutputFile? "inline":"none";
     this.parametersdiv.style.display = (this.paramControls.length > 0)? "block":"none";
     this.errordiv.style.display = this.hasError? "block":"none";
     this.statusdiv.style.display = this.hasError? "none":"block";    
@@ -684,7 +707,7 @@ OpenJsCad.Processor.prototype = {
     }
     return paramValues;
   },
-  
+    
   rebuildSolid: function()
   {
     this.abort();
@@ -700,7 +723,7 @@ OpenJsCad.Processor.prototype = {
     {
       try
       {
-        this.worker = OpenJsCad.javaScriptToSolidASync(this.script, paramValues, function(err, csg) {
+        this.worker = OpenJsCad.parseJsCadScriptASync(this.script, paramValues, function(err, obj) {
           that.processing = false;
           that.worker = null;
           if(err)
@@ -710,9 +733,7 @@ OpenJsCad.Processor.prototype = {
           }
           else
           {
-            that.solid = csg;      
-            if(that.viewer) that.viewer.setCsg(csg);
-            that.validcsg = true;
+            that.setCurrentObject(obj);
             that.statusspan.innerHTML = "Ready.";
           }
           that.enableItems();
@@ -729,11 +750,9 @@ OpenJsCad.Processor.prototype = {
     {
       try
       {
-        var csg = OpenJsCad.javaScriptToSolidSync(this.script, paramValues, this.debugging);
+        var obj = OpenJsCad.parseJsCadScriptSync(this.script, paramValues, this.debugging);
+        that.setCurrentObject(obj);
         that.processing = false;
-        that.solid = csg;      
-        if(that.viewer) that.viewer.setCsg(csg);
-        that.validcsg = true;
         that.statusspan.innerHTML = "Ready.";
       }
       catch(e)
@@ -753,106 +772,138 @@ OpenJsCad.Processor.prototype = {
   },
   
   hasSolid: function() {
-    return this.validcsg;
+    return this.hasValidCurrentObject;
   },
 
   isProcessing: function() {
     return this.processing;
   },
-  
-/*
-  clearStl1: function() {
-    if(this.hasstl)
+   
+  clearOutputFile: function() {
+    if(this.hasOutputFile)
     {
-      this.hasstl = false;
-      OpenJsCad.revokeBlobUrl(this.stlBlobUrl);
-      this.stlBlobUrl = null;
-      this.enableItems();
-      if(this.onchange) this.onchange();
-    }
-  },
-  
-*/
-  
-  clearStl: function() {
-    if(this.hasstl)
-    {
-      this.hasstl = false;
-      if(this.stlDirEntry)
+      this.hasOutputFile = false;
+      if(this.outputFileDirEntry)
       {
-        this.stlDirEntry.removeRecursively(function(){});
-        this.stlDirEntry=null;
+        this.outputFileDirEntry.removeRecursively(function(){});
+        this.outputFileDirEntry=null;
       }
-      if(this.stlBlobUrl)
+      if(this.outputFileBlobUrl)
       {
-        OpenJsCad.revokeBlobUrl(this.stlBlobUrl);
-        this.stlBlobUrl = null;
+        OpenJsCad.revokeBlobUrl(this.outputFileBlobUrl);
+        this.outputFileBlobUrl = null;
       }
       this.enableItems();
       if(this.onchange) this.onchange();
     }
   },
 
-  generateStl: function() {
-    this.clearStl();
-    if(this.validcsg)
+  generateOutputFile: function() {
+    this.clearOutputFile();
+    if(this.hasValidCurrentObject)
     {
       try
       {
-        this.generateStlFileSystem();
+        this.generateOutputFileFileSystem();
       }
       catch(e)
       {
-        this.generateStlBlobUrl();
+        this.generateOutputFileBlobUrl();
       }
     }
   },
-  
-  generateStlBlobUrl: function() {
-    var bb=OpenJsCad.getBlobBuilder();    
-    var windowURL=OpenJsCad.getWindowURL();
-    this.solid.toStlBinary(bb);
-    var blob = bb.getBlob();
-    this.stlBlobUrl = windowURL.createObjectURL(blob)
-    if(!this.stlBlobUrl) throw new Error("createObjectURL() failed"); 
 
-    this.hasstl = true;
-    this.downloadStlLink.href = this.stlBlobUrl;
+  currentObjectToBlob: function() {
+    var bb=OpenJsCad.getBlobBuilder();
+    var mimetype = this.mimeTypeForCurrentObject();
+    if(this.currentObject instanceof CSG)
+    {
+      this.currentObject.toStlBinary(bb);
+      mimetype = "application/sla";
+    }
+    else if(this.currentObject instanceof CAG)
+    {
+      this.currentObject.toDxf(bb);
+      mimetype = "application/dxf";
+    }
+    else
+    {
+      throw new Error("Not supported");
+    }    
+    var blob = bb.getBlob(mimetype);
+    return blob;
+  },
+
+  mimeTypeForCurrentObject: function() {
+    var ext = this.extensionForCurrentObject();
+    return {
+      stl: "application/sla",
+      dxf: "application/dxf",
+    }[ext];
+  },
+
+  extensionForCurrentObject: function() {
+    var extension;
+    if(this.currentObject instanceof CSG)
+    {
+      extension = "stl";
+    }
+    else if(this.currentObject instanceof CAG)
+    {
+      extension = "dxf";
+    }
+    else
+    {
+      throw new Error("Not supported");
+    }
+    return extension;    
+  },
+
+  downloadLinkTextForCurrentObject: function() {
+    var ext = this.extensionForCurrentObject();
+    return "Download "+ext.toUpperCase();
+  },
+
+  generateOutputFileBlobUrl: function() {
+    var blob = this.currentObjectToBlob();
+    var windowURL=OpenJsCad.getWindowURL();
+    this.outputFileBlobUrl = windowURL.createObjectURL(blob)
+    if(!this.outputFileBlobUrl) throw new Error("createObjectURL() failed"); 
+    this.hasOutputFile = true;
+    this.downloadOutputFileLink.href = this.outputFileBlobUrl;
+    this.downloadOutputFileLink.innerHTML = this.downloadLinkTextForCurrentObject();
     this.enableItems();
     if(this.onchange) this.onchange();
   },
 
-  generateStlFileSystem: function() {
-    // var stltxt = this.solid.toStlString();
+  generateOutputFileFileSystem: function() {
     window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
     if(!window.requestFileSystem)
     {
       throw new Error("Your browser does not support the HTML5 FileSystem API. Please try the Chrome browser instead.");
     }
     // create a random directory name:
-    var dirname = "OpenJsCadStlOutput1_"+parseInt(Math.random()*1000000000, 10)+".stl";
-    var filename = this.filename+".stl";
+    var dirname = "OpenJsCadOutput1_"+parseInt(Math.random()*1000000000, 10)+"."+extension;
+    var extension = this.extensionForCurrentObject();
+    var filename = this.filename+"."+extension;
     var that = this;
     window.requestFileSystem(TEMPORARY, 20*1024*1024, function(fs){
         fs.root.getDirectory(dirname, {create: true, exclusive: true}, function(dirEntry) {
-            that.stlDirEntry = dirEntry;
+            that.outputFileDirEntry = dirEntry;
             dirEntry.getFile(filename, {create: true, exclusive: true}, function(fileEntry) {
                  fileEntry.createWriter(function(fileWriter) {
                     fileWriter.onwriteend = function(e) {
-                      that.hasstl = true;
-                      that.downloadStlLink.href = fileEntry.toURL();
-                      that.downloadStlLink.type="application/sla";
+                      that.hasOutputFile = true;
+                      that.downloadOutputFileLink.href = fileEntry.toURL();
+                      that.downloadOutputFileLink.type = that.mimeTypeForCurrentObject(); 
+                      that.downloadOutputFileLink.innerHTML = that.downloadLinkTextForCurrentObject();
                       that.enableItems();
                       if(that.onchange) that.onchange();
                     };
                     fileWriter.onerror = function(e) {
                       throw new Error('Write failed: ' + e.toString());
                     };
-                    // Create a new Blob and write it to log.txt.
-                    var bb=OpenJsCad.getBlobBuilder();    
-                    that.solid.toStlBinary(bb);
-                    // bb.append(stltxt);
-                    var blob=bb.getBlob("application/sla");
+                    var blob = that.currentObjectToBlob();
                     fileWriter.write(blob);                
                   }, 
                   function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 

@@ -94,7 +94,8 @@ CSG model is contructed using Javascript. For example:<br>
   return cube;
 }</pre>
 creates a cube with a radius of 1 and centered at the origin.
-The code should always contain a main() function, returning a CSG solid. 
+The code should always contain a main() function. The main() function should either return a CSG object (for a 3D solid)
+or a CAG object (for a 2D area). 3D solids can be exported as STL files, 2D areas can be exported in a DXF file. 
 <br><br>
 To build your own models, create a .jscad file with your javascript code and parse the file using the 
 <a href="processfile.html">OpenJsCad parser</a>. When finished, click on Generate STL and save the result
@@ -467,15 +468,23 @@ as well:
   <li>translate, scale, rotate, mirror. For rotation rotateZ() should be used, which rotates about the origin.</li>
   <li>expand(), contract()</li>
 </ul>
-To actually use the CAG shape it needs to be extruded into a 3D CSG object through the extrude() function. extrude()
-places the 2D solid onto the z=0 plane, and extrudes in the specified direction. Extrusion can be done with an optional
+CAG shapes can be converted into a 3D solid through extrusion.
+The extrude() function
+places the 2D area onto the 3D z=0 plane, and extrudes in the specified direction. Extrusion can be done with an optional
 twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
 The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
 between the bottom and top surface.
 <br><br>
-A 3D solid can be converted back to a 2D CAG using projectToOrthoNormalBasis(). This can be seen as the projection of the solid onto a plane
-using a distant light source; the result is a CAG representing the shadow of the object. The orthonormal basis is constructed from a plane
-and a right-hand vector (read more about orthonormal bases below).
+A 3D solid can be converted back to a 2D CAG using sectionCut() and projectToOrthoNormalBasis().
+sectionCut() cuts the solid by a plane and returns the 2D intersection as a CAG object.
+projectToOrthoNormalBasis() works similarly but instead of cutting by a thin plane, it can be seen as 
+the projection of the solid onto a plane
+using a distant light source; the result is a CAG representing the shadow of the object. 
+Both functions take a CSG.OrthoNormalBasis as the argument. An orthonormal basis is a combination of a plane and
+a right-hand vector (read more about orthonormal bases below).
+<br><br>
+Note that your main() function may return a CAG object: in this case OpenJsCad will display it as a 'thin' 3D
+shape. The result can be exported as a DXF file, ready for laser cutting or CNC routing.
 <pre>
 // Create a shape; argument is an array of 2D coordinates
 var shape1 = CAG.fromPoints([[0,0], [5,0], [3,5], [0,5]]);
@@ -504,6 +513,8 @@ var extruded=shape.extrude({
 
 var cube2d = CSG.cube({radius: 10}).rotateZ(45);
 var z0basis = CSG.OrthoNormalBasis.Z0Plane();
+var cag = cube2d.sectionCut(z0basis);
+// or:
 var cag = cube2d.projectToOrthoNormalBasis(z0basis);
 </pre>
 For an example of 2D shapes see the <a href="hookdemo.html">Parametric S hook</a> demo.
