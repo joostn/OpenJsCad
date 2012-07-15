@@ -3615,6 +3615,16 @@ CSG.OrthoNormalBasis.prototype = {
     var b3d = this.to3D(b);
     return CSG.Line3D.fromPoints(a3d, b3d);
   },
+  
+  transform: function(matrix4x4) {
+    // todo: this may not work properly in case of mirroring
+    var newplane = this.plane.transform(matrix4x4);
+    var rightpoint_transformed = this.u.transform(matrix4x4);
+    var origin_transformed = new CSG.Vector3D(0,0,0).transform(matrix4x4);     
+    var newrighthandvector = rightpoint_transformed.minus(origin_transformed);
+    var newbasis = new CSG.OrthoNormalBasis(newplane, newrighthandvector);
+    return newbasis;
+  },
 };
 
 function insertSorted(array, element, comparefunc) {
