@@ -127,6 +127,7 @@ function main(params)
         plates[i] = plate3d;
       }
       var result = new CSG().union(plates);
+      result = result.rotateX(90);
       return result;
     }
   }
