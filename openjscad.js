@@ -301,8 +301,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
   workerscript += "return main("+JSON.stringify(mainParameters)+");";  
   var f = new Function(workerscript);
   OpenJsCad.log.prevLogTime = Date.now();    
-  var obj = f();
-  return obj;
+  var result = f();
+  return result;
 };
 
 // callback: should be function(error, csg)
@@ -817,8 +817,8 @@ OpenJsCad.Processor.prototype = {
     var bb=OpenJsCad.getBlobBuilder();
     var mimetype = this.mimeTypeForCurrentObject();
     if(this.currentObject instanceof CSG)
-    {
-      this.currentObject.toStlBinary(bb);
+    {      
+      this.currentObject.fixTJunctions().toStlBinary(bb);
       mimetype = "application/sla";
     }
     else if(this.currentObject instanceof CAG)
