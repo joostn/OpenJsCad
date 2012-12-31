@@ -162,6 +162,37 @@ OpenJsCad.Viewer.prototype = {
       gl.disable(gl.BLEND);
       if (this.lineOverlay) gl.enable(gl.DEPTH_TEST);
     }
+    //EDW: axes
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.begin(gl.LINES);
+    //X
+      gl.color(1, 0.5, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(-100, 0, 0);
+      gl.vertex(0, 0, 0);
+
+      gl.color(1, 0, 0, 0.8);//positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(100, 0, 0);
+    //Y
+      gl.color(0.5, 1, 0.5, 0.2);//negative direction is lighter
+      gl.vertex(0, -100, 0);
+      gl.vertex(0, 0, 0);
+
+      gl.color(0, 1, 0, 0.8);//positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 100, 0);
+    //Z
+      gl.color(0.5, 0.5, 1, 0.2);//negative direction is lighter
+      gl.vertex(0, 0, -100);
+      gl.vertex(0, 0, 0);
+
+      gl.color(0, 0, 1, 0.8);//positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 0, 100);
+    gl.end();
+    gl.disable(gl.BLEND);
+
   },  
 }
 
