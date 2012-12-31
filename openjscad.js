@@ -551,6 +551,12 @@ OpenJsCad.Processor.prototype = {
       that.abort();
     };
     this.statusbuttons.appendChild(this.abortbutton);
+    this.formatDropdown = document.createElement("select");
+    this.formatDropdown.onchange = function(e) {
+      that.currentFormat = that.formatDropdown.options[that.formatDropdown.selectedIndex].value;
+      that.updateDownloadLink();
+    };
+    this.statusbuttons.appendChild(this.formatDropdown);
     this.generateOutputFileButton = document.createElement("button");
     this.generateOutputFileButton.onclick = function(e) {
       that.generateOutputFile();
@@ -588,7 +594,31 @@ OpenJsCad.Processor.prototype = {
       this.viewer.setCsg(csg);
     }
     this.hasValidCurrentObject = true;
-    var ext = this.extensionForCurrentObject();
+    
+    while(this.formatDropdown.options.length > 0)
+      this.formatDropdown.options.remove();
+    
+    var that = this;
+    this.supportedFormatsForCurrentObject().forEach(function(format) {
+      var option = document.createElement("option");
+      option.setAttribute("value", format);
+      option.appendChild(document.createTextNode(that.formatInfo(format).displayName));
+      that.formatDropdown.options.add(option);
+    });
+    
+    this.updateDownloadLink();
+  },
+  
+  selectedFormat: function() {
+    return this.formatDropdown.options[this.formatDropdown.selectedIndex].value;
+  },
+
+  selectedFormatInfo: function() {
+    return this.formatInfo(this.selectedFormat());
+  },
+  
+  updateDownloadLink: function() {
+    var ext = this.selectedFormatInfo().extension;
     this.generateOutputFileButton.innerHTML = "Generate "+ext.toUpperCase();
   },
   
@@ -613,6 +643,7 @@ OpenJsCad.Processor.prototype = {
   
   enableItems: function() {
     this.abortbutton.style.display = this.processing? "inline":"none";
+    this.formatDropdown.style.display = ((!this.hasOutputFile)&&(this.hasValidCurrentObject))? "inline":"none";
     this.generateOutputFileButton.style.display = ((!this.hasOutputFile)&&(this.hasValidCurrentObject))? "inline":"none";
     this.downloadOutputFileLink.style.display = this.hasOutputFile? "inline":"none";
     this.parametersdiv.style.display = (this.paramControls.length > 0)? "block":"none";
@@ -815,16 +846,19 @@ OpenJsCad.Processor.prototype = {
 
   currentObjectToBlob: function() {
     var bb=OpenJsCad.getBlobBuilder();
-    var mimetype = this.mimeTypeForCurrentObject();
-    if(this.currentObject instanceof CSG)
+    var mimetype = this.selectedFormatInfo().mimetype;
+    var format = this.selectedFormat();
+    
+    if(format == "stl")
     {      
       this.currentObject.fixTJunctions().toStlBinary(bb);
-      mimetype = "application/sla";
     }
-    else if(this.currentObject instanceof CAG)
+    else if(format == "x3d") {
+      this.currentObject.fixTJunctions().toX3D(bb);
+    }
+    else if(format == "dxf")
     {
       this.currentObject.toDxf(bb);
-      mimetype = "application/dxf";
     }
     else
     {
@@ -833,34 +867,39 @@ OpenJsCad.Processor.prototype = {
     var blob = bb.getBlob(mimetype);
     return blob;
   },
-
-  mimeTypeForCurrentObject: function() {
-    var ext = this.extensionForCurrentObject();
-    return {
-      stl: "application/sla",
-      dxf: "application/dxf",
-    }[ext];
-  },
-
-  extensionForCurrentObject: function() {
-    var extension;
-    if(this.currentObject instanceof CSG)
-    {
-      extension = "stl";
-    }
-    else if(this.currentObject instanceof CAG)
-    {
-      extension = "dxf";
-    }
-    else
-    {
+  
+  supportedFormatsForCurrentObject: function() {
+    if (this.currentObject instanceof CSG) {
+      return ["stl", "x3d"];
+    } else if (this.currentObject instanceof CAG) {
+      return ["dxf"];
+    } else {
       throw new Error("Not supported");
     }
-    return extension;    
+  },
+  
+  formatInfo: function(format) {
+    return {
+      stl: {
+        displayName: "STL",
+        extension: "stl",
+        mimetype: "application/sla",
+        },
+      x3d: {
+        displayName: "X3D",
+        extension: "x3d",
+        mimetype: "model/x3d+xml",
+        },
+      dxf: {
+        displayName: "DXF",
+        extension: "dxf",
+        mimetype: "application/dxf",
+        }
+    }[format];
   },
 
   downloadLinkTextForCurrentObject: function() {
-    var ext = this.extensionForCurrentObject();
+    var ext = this.selectedFormatInfo().extension;
     return "Download "+ext.toUpperCase();
   },
 
@@ -884,7 +923,7 @@ OpenJsCad.Processor.prototype = {
     }
     // create a random directory name:
     var dirname = "OpenJsCadOutput1_"+parseInt(Math.random()*1000000000, 10)+"."+extension;
-    var extension = this.extensionForCurrentObject();
+    var extension = this.selectedFormatInfo().extension;
     var filename = this.filename+"."+extension;
     var that = this;
     window.requestFileSystem(TEMPORARY, 20*1024*1024, function(fs){
@@ -895,7 +934,7 @@ OpenJsCad.Processor.prototype = {
                     fileWriter.onwriteend = function(e) {
                       that.hasOutputFile = true;
                       that.downloadOutputFileLink.href = fileEntry.toURL();
-                      that.downloadOutputFileLink.type = that.mimeTypeForCurrentObject(); 
+                      that.downloadOutputFileLink.type = that.selectedFormatInfo().mimetype; 
                       that.downloadOutputFileLink.innerHTML = that.downloadLinkTextForCurrentObject();
                       that.enableItems();
                       if(that.onchange) that.onchange();
