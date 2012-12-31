@@ -911,6 +911,7 @@ OpenJsCad.Processor.prototype = {
     this.hasOutputFile = true;
     this.downloadOutputFileLink.href = this.outputFileBlobUrl;
     this.downloadOutputFileLink.innerHTML = this.downloadLinkTextForCurrentObject();
+    this.downloadOutputFileLink.setAttribute("download", "openjscad."+this.extensionForCurrentObject());
     this.enableItems();
     if(this.onchange) this.onchange();
   },
@@ -936,6 +937,7 @@ OpenJsCad.Processor.prototype = {
                       that.downloadOutputFileLink.href = fileEntry.toURL();
                       that.downloadOutputFileLink.type = that.selectedFormatInfo().mimetype; 
                       that.downloadOutputFileLink.innerHTML = that.downloadLinkTextForCurrentObject();
+                      that.downloadOutputFileLink.setAttribute("download", fileEntry.name);
                       that.enableItems();
                       if(that.onchange) that.onchange();
                     };
