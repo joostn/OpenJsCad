@@ -32,6 +32,8 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
   this.viewpointY = 0;
   this.viewpointZ = initialdepth;
 
+  // Draw axes flag:
+  this.drawAxes = true;
   // Draw triangle lines:
   this.drawLines = false;
   // Set to true so lines don't use the depth buffer
@@ -168,36 +170,38 @@ OpenJsCad.Viewer.prototype = {
       if (this.lineOverlay) gl.enable(gl.DEPTH_TEST);
     }
     //EDW: axes
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.begin(gl.LINES);
-    //X - red
-    gl.color(1, 0.5, 0.5, 0.2); //negative direction is lighter
-    gl.vertex(-100, 0, 0);
-    gl.vertex(0, 0, 0);
+    if (this.drawAxes) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.begin(gl.LINES);
+      //X - red
+      gl.color(1, 0.5, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(-100, 0, 0);
+      gl.vertex(0, 0, 0);
 
-    gl.color(1, 0, 0, 0.8); //positive direction
-    gl.vertex(0, 0, 0);
-    gl.vertex(100, 0, 0);
-    //Y - green
-    gl.color(0.5, 1, 0.5, 0.2); //negative direction is lighter
-    gl.vertex(0, -100, 0);
-    gl.vertex(0, 0, 0);
+      gl.color(1, 0, 0, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(100, 0, 0);
+      //Y - green
+      gl.color(0.5, 1, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(0, -100, 0);
+      gl.vertex(0, 0, 0);
 
-    gl.color(0, 1, 0, 0.8); //positive direction
-    gl.vertex(0, 0, 0);
-    gl.vertex(0, 100, 0);
-    //Z - black
-    gl.color(0.5, 0.5, 0.5, 0.2); //negative direction is lighter
-    gl.vertex(0, 0, -100);
-    gl.vertex(0, 0, 0);
+      gl.color(0, 1, 0, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 100, 0);
+      //Z - black
+      gl.color(0.5, 0.5, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(0, 0, -100);
+      gl.vertex(0, 0, 0);
 
-    gl.color(0.2, 0.2, 0.2, 0.8); //positive direction
-    gl.vertex(0, 0, 0);
-    gl.vertex(0, 0, 100);
+      gl.color(0.2, 0.2, 0.2, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 0, 100);
 
-    gl.end();
-    gl.disable(gl.BLEND);
+      gl.end();
+      gl.disable(gl.BLEND);
+    }
   }
 }
 
