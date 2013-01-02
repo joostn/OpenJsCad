@@ -648,7 +648,7 @@ OpenJsCad.Processor.prototype = {
     this.hasValidCurrentObject = true;
     
     while(this.formatDropdown.options.length > 0)
-      this.formatDropdown.options.remove();
+      this.formatDropdown.options.remove(0);
     
     var that = this;
     this.supportedFormatsForCurrentObject().forEach(function(format) {
