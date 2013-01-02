@@ -1005,7 +1005,8 @@ OpenJsCad.Processor.prototype = {
     this.hasOutputFile = true;
     this.downloadOutputFileLink.href = this.outputFileBlobUrl;
     this.downloadOutputFileLink.innerHTML = this.downloadLinkTextForCurrentObject();
-    this.downloadOutputFileLink.setAttribute("download", "openjscad."+this.extensionForCurrentObject());
+    var ext = this.selectedFormatInfo().extension;
+    this.downloadOutputFileLink.setAttribute("download", "openjscad."+ext);
     this.enableItems();
     if(this.onchange) this.onchange();
   },
