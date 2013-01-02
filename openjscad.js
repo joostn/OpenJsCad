@@ -100,6 +100,25 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
   gl.ondraw = function() {
     _this.onDraw();
   };
+  gl.onmousewheel = function(e) {
+    var wheelDelta = 0;    
+    if (e.wheelDelta)
+    {
+      wheelDelta = e.wheelDelta;
+    }
+    else if (e.detail)
+    {
+      // for firefox, see http://stackoverflow.com/questions/8886281/event-wheeldelta-returns-undefined
+      wheelDelta = e.detail * -40;     
+    }
+    if(wheelDelta)
+    {
+      var factor = Math.pow(1.003, -wheelDelta);
+      var coeff = _this.getZoom();
+      coeff *= factor;
+      _this.setZoom(coeff);
+    }
+  };
   this.clear();
 };
 
@@ -121,10 +140,22 @@ OpenJsCad.Viewer.prototype = {
 
   ZOOM_MAX: 1000,
   ZOOM_MIN: 10,
+  onZoomChanged: null,
 
-  zoom: function(coeff) { //0...1
+  setZoom: function(coeff) { //0...1
+    coeff=Math.max(coeff, 0);
+    coeff=Math.min(coeff, 1);
     this.viewpointZ = this.ZOOM_MIN + coeff * (this.ZOOM_MAX - this.ZOOM_MIN);
+    if(this.onZoomChanged)
+    {
+      this.onZoomChanged();
+    }
     this.onDraw();
+  },
+
+  getZoom: function() {
+    var coeff = (this.viewpointZ-this.ZOOM_MIN) / (this.ZOOM_MAX - this.ZOOM_MIN);
+    return coeff;
   },
   
   onMouseMove: function(e) {
@@ -574,11 +605,22 @@ OpenJsCad.Processor.prototype = {
     div.style.width = this.viewerwidth * 11 + 'px';
     div.style.height = '1px';
     this.zoomControl.appendChild(div);
+    this.zoomChangedBySlider=false;
     this.zoomControl.onscroll = function(event) {
       var zoom = that.zoomControl;
-
-      that.viewer.zoom(zoom.scrollLeft / (10 * zoom.offsetWidth));
+      var newzoom=zoom.scrollLeft / (10 * zoom.offsetWidth);
+      that.zoomChangedBySlider=true; // prevent recursion via onZoomChanged 
+      that.viewer.setZoom(newzoom);
+      that.zoomChangedBySlider=false;
     };
+    this.viewer.onZoomChanged = function() {
+      if(!that.zoomChangedBySlider)
+      {
+        var newzoom = that.viewer.getZoom();
+        that.zoomControl.scrollLeft = newzoom * (10 * that.zoomControl.offsetWidth);
+      }
+    };
+
     this.containerdiv.appendChild(this.zoomControl);
     //this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * this.zoomControl.offsetWidth;
     this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * 
