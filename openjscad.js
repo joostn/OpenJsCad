@@ -574,12 +574,14 @@ OpenJsCad.Processor.prototype = {
     {
       this.containerdiv.removeChild(0);
     }
+/*    
     if(!OpenJsCad.isChrome() )
     {
       var div = document.createElement("div");
       div.innerHTML = "Please note: OpenJsCad currently only runs reliably on Google Chrome!";
       this.containerdiv.appendChild(div);
     }
+*/    
     var viewerdiv = document.createElement("div");
     viewerdiv.className = "viewer";
     viewerdiv.style.width = this.viewerwidth + "px";
