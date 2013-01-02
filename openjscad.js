@@ -25,12 +25,15 @@ OpenJsCad.log = function(txt) {
 OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
   var gl = GL.create();
   this.gl = gl;
-  this.angleX = 0;
+  this.angleX = -60;
   this.angleY = 0;
+  this.angleZ = -45;
   this.viewpointX = 0;
   this.viewpointY = 0;
   this.viewpointZ = initialdepth;
 
+  // Draw axes flag:
+  this.drawAxes = true;
   // Draw triangle lines:
   this.drawLines = false;
   // Set to true so lines don't use the depth buffer
@@ -113,28 +116,31 @@ OpenJsCad.Viewer.prototype = {
   },
 
   supported: function() {
-    return !!this.gl; 
+    return !!this.gl;
+  },
+
+  ZOOM_MAX: 1000,
+  ZOOM_MIN: 10,
+
+  zoom: function(coeff) { //0...1
+    this.viewpointZ = this.ZOOM_MIN + coeff * (this.ZOOM_MAX - this.ZOOM_MIN);
+    this.onDraw();
   },
   
   onMouseMove: function(e) {
     if (e.dragging) {
       e.preventDefault();
-      if(e.altKey)
-      {
-        var factor = 1e-2;
-        this.viewpointZ *= Math.pow(2,factor * e.deltaY);
-      }
-      else if(e.shiftKey)
-      {
+      if(e.altKey) { //ROTATE Z, X
+        this.angleZ += e.deltaX * 2;
+        this.angleX += e.deltaY * 2;
+      } else if(e.shiftKey) {//PAN
         var factor = 5e-3;
-        this.viewpointX += factor * e.deltaX * this.viewpointZ; 
-        this.viewpointY -= factor * e.deltaY * this.viewpointZ; 
-      }
-      else
-      {
+        this.viewpointX += factor * e.deltaX * this.viewpointZ;
+        this.viewpointY -= factor * e.deltaY * this.viewpointZ;
+      } else {//ROTATE X, Y
         this.angleY += e.deltaX * 2;
         this.angleX += e.deltaY * 2;
-        this.angleX = Math.max(-90, Math.min(90, this.angleX));
+        //this.angleX = Math.max(-180, Math.min(180, this.angleX));
       }
       this.onDraw();    
     }
@@ -149,6 +155,7 @@ OpenJsCad.Viewer.prototype = {
     gl.translate(this.viewpointX, this.viewpointY, -this.viewpointZ);
     gl.rotate(this.angleX, 1, 0, 0);
     gl.rotate(this.angleY, 0, 1, 0);
+    gl.rotate(this.angleZ, 0, 0, 1);
 
     if (!this.lineOverlay) gl.enable(gl.POLYGON_OFFSET_FILL);
     this.lightingShader.draw(this.mesh, gl.TRIANGLES);
@@ -162,7 +169,40 @@ OpenJsCad.Viewer.prototype = {
       gl.disable(gl.BLEND);
       if (this.lineOverlay) gl.enable(gl.DEPTH_TEST);
     }
-  },  
+    //EDW: axes
+    if (this.drawAxes) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.begin(gl.LINES);
+      //X - red
+      gl.color(1, 0.5, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(-100, 0, 0);
+      gl.vertex(0, 0, 0);
+
+      gl.color(1, 0, 0, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(100, 0, 0);
+      //Y - green
+      gl.color(0.5, 1, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(0, -100, 0);
+      gl.vertex(0, 0, 0);
+
+      gl.color(0, 1, 0, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 100, 0);
+      //Z - black
+      gl.color(0.5, 0.5, 0.5, 0.2); //negative direction is lighter
+      gl.vertex(0, 0, -100);
+      gl.vertex(0, 0, 0);
+
+      gl.color(0.2, 0.2, 0.2, 0.8); //positive direction
+      gl.vertex(0, 0, 0);
+      gl.vertex(0, 0, 100);
+
+      gl.end();
+      gl.disable(gl.BLEND);
+    }
+  }
 }
 
 // Convert from CSG solid to GL.Mesh object
@@ -311,7 +351,7 @@ OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, callback) {
     "csg.js",
     "openjscad.js"
   ];
-  var baseurl = document.location + "";
+  var baseurl = document.location.href.replace(/\?.*$/, '');
   var workerscript = "";
   workerscript += script;
   workerscript += "\n\n\n\n//// The following code is added by OpenJsCad:\n";
@@ -461,9 +501,10 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.onchange = onchange;
   this.viewerdiv = null;
   this.viewer = null;
+  this.zoomControl = null;
   this.viewerwidth = 800;
   this.viewerheight = 600;
-  this.initialViewerDistance = 50;
+  this.initialViewerDistance = 200;
   this.processing = false;
   this.currentObject = null;
   this.hasValidCurrentObject = false;
@@ -496,6 +537,8 @@ OpenJsCad.Processor.convertToSolid = function(obj) {
 
 OpenJsCad.Processor.prototype = {
   createElements: function() {
+    var that = this;//for event handlers
+
     while(this.containerdiv.children.length > 0)
     {
       this.containerdiv.removeChild(0);
@@ -516,11 +559,33 @@ OpenJsCad.Processor.prototype = {
     try
     {
       this.viewer = new OpenJsCad.Viewer(this.viewerdiv, this.viewerwidth, this.viewerheight, this.initialViewerDistance);
-    } catch (e) {
-//      this.viewer = null;
-      this.viewerdiv.innerHTML = "<b><br><br>Error: "+e.toString()+"</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
-//      this.viewerdiv.innerHTML = e.toString();
+    } catch(e) {
+      //      this.viewer = null;
+      this.viewerdiv.innerHTML = "<b><br><br>Error: " + e.toString() + "</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
+      //      this.viewerdiv.innerHTML = e.toString();
     }
+    //Zoom control
+    var div = document.createElement("div");
+    this.zoomControl = div.cloneNode(false);
+    this.zoomControl.style.width = this.viewerwidth + 'px';
+    this.zoomControl.style.height = '20px';
+    this.zoomControl.style.backgroundColor = 'transparent';
+    this.zoomControl.style.overflowX = 'scroll';
+    div.style.width = this.viewerwidth * 11 + 'px';
+    div.style.height = '1px';
+    this.zoomControl.appendChild(div);
+    this.zoomControl.onscroll = function(event) {
+      var zoom = that.zoomControl;
+
+      that.viewer.zoom(zoom.scrollLeft / (10 * zoom.offsetWidth));
+    };
+    this.containerdiv.appendChild(this.zoomControl);
+    //this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * this.zoomControl.offsetWidth;
+    this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * 
+      (this.zoomControl.scrollWidth - this.zoomControl.offsetWidth);
+
+    //end of zoom control
+
     this.errordiv = document.createElement("div");
     this.errorpre = document.createElement("pre"); 
     this.errordiv.appendChild(this.errorpre);
@@ -534,7 +599,6 @@ OpenJsCad.Processor.prototype = {
     this.statusdiv.appendChild(this.statusbuttons);
     this.abortbutton = document.createElement("button");
     this.abortbutton.innerHTML = "Abort";
-    var that = this;
     this.abortbutton.onclick = function(e) {
       that.abort();
     };
