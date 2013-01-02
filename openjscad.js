@@ -373,15 +373,6 @@ OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, callback) {
   return worker;
 };
 
-OpenJsCad.getBlobBuilder = function() {
-  var bb;
-  if(window.BlobBuilder) bb = new window.BlobBuilder()
-  else if(window.WebKitBlobBuilder) bb = new window.WebKitBlobBuilder()
-  else if(window.MozBlobBuilder) bb = new window.MozBlobBuilder()
-  else throw new Error("Your browser doesn't support BlobBuilder");
-  return bb;
-};
-
 OpenJsCad.getWindowURL = function() {
   if(window.URL) return window.URL;
   else if(window.webkitURL) return window.webkitURL;
@@ -389,11 +380,8 @@ OpenJsCad.getWindowURL = function() {
 };
 
 OpenJsCad.textToBlobUrl = function(txt) {
-  var bb=OpenJsCad.getBlobBuilder();
   var windowURL=OpenJsCad.getWindowURL();
-
-  bb.append(txt);
-  var blob = bb.getBlob();
+  var blob = new Blob([txt]);
   var blobURL = windowURL.createObjectURL(blob)
   if(!blobURL) throw new Error("createObjectURL() failed"); 
   return blobURL;
@@ -845,26 +833,24 @@ OpenJsCad.Processor.prototype = {
   },
 
   currentObjectToBlob: function() {
-    var bb=OpenJsCad.getBlobBuilder();
-    var mimetype = this.selectedFormatInfo().mimetype;
     var format = this.selectedFormat();
     
+    var blob;
     if(format == "stl")
     {      
-      this.currentObject.fixTJunctions().toStlBinary(bb);
+      blob=this.currentObject.fixTJunctions().toStlBinary();
     }
     else if(format == "x3d") {
-      this.currentObject.fixTJunctions().toX3D(bb);
+      blob=this.currentObject.fixTJunctions().toX3D(bb);
     }
     else if(format == "dxf")
     {
-      this.currentObject.toDxf(bb);
+      blob=this.currentObject.toDxf();
     }
     else
     {
       throw new Error("Not supported");
     }    
-    var blob = bb.getBlob(mimetype);
     return blob;
   },
   
