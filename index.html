@@ -115,9 +115,8 @@ points, even if you don't know the actual orientation or size.</li>
     <a href="processfile.html">OpenJsCad parser</a> for details.</li>
 </ul>
 <h2>Viewer navigation</h2>
-Click and drag to rotate the model around the origin.<br>
-Shift+Drag moves the model around.<br>
-Alt+drag zooms (by changing the distance between camera and model).
+Click and drag to rotate the model around the origin. Hold down Alt to change the axis of rotation. 
+Shift+Drag moves the model around. Zoom using the slider below the model.
 <h2>Demos</h2>
 <ul>
 <li><a href="gearsdemo.html">Involute Gears</a></li>
@@ -128,17 +127,21 @@ Alt+drag zooms (by changing the distance between camera and model).
 <li><a href="lampshadedemo.html">Parametric Lamp Shade</a>: creating 2D panels (for CNC / laser cutting) from a 3D design</li>
 </ul>
 <h2>License</h2>
-Copyright (c) 2012 Joost Nieuwenhuijse.
+OpenJsCad is developed by <a href="https://github.com/joostn">Joost Nieuwenhuijse</a>.
 Based on <a href="https://github.com/evanw/csg.js">initial CSG.js</a> copyright (c) 2011 Evan Wallace.
-Uses <a href="https://github.com/evanw/lightgl.js">lightgl.js</a> by Evan Wallace for WebGL rendering. Contributions
-by Alexandre Girard (https://github.com/alx), Tom Robinson (https://github.com/tlrobinson). 
+Uses <a href="https://github.com/evanw/lightgl.js">lightgl.js</a> by Evan Wallace for WebGL rendering. 
+Contributions by <a href="https://github.com/alx">Alexandre Girard</a>, 
+<a href="https://github.com/tlrobinson">Tom Robinson</a>,
+ <a href="https://github.com/jboecker">jboecker</a> and
+ <a href="https://github.com/tedbeer">tedbeer</a>.
 All code released under MIT license.
 <br><br>
 Contributions are welcome! It's all written in Javascript, so if you know how to use it you
-know how to modify it as well.<br><br>
+know how to modify it as well.
 To contribute go to <a href="https://github.com/joostn/OpenJsCad/tree/gh-pages">OpenJsCad at GitHub (gh-pages tree)</a>,
 <a href="http://help.github.com/fork-a-repo/">create your own fork</a> and 
-<a href="http://help.github.com/send-pull-requests/">send me a pull request</a>.
+<a href="http://help.github.com/send-pull-requests/">send me a pull request</a>. Note that the code is maintained 
+in the gh-pages branch, not the master branch, so that it can be accessed directly via Github pages.
 <h2>Primitive solids</h2>
 Currently the following solids are supported. The parameters are passed in an object; most
 parameters are optional. 3D vectors can be passed in an array. If a scalar is passed
