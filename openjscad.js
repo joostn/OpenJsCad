@@ -377,20 +377,35 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
 };
 
 // callback: should be function(error, csg)
-OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, callback) {
+OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, callback) {
   var baselibraries = [
     "csg.js",
     "openjscad.js"
   ];
+
   var baseurl = document.location.href.replace(/\?.*$/, '');
+  var openjscadurl = baseurl;
+  if (options['openJsCadPath'] != null) {
+    openjscadurl = OpenJsCad.makeAbsoluteUrl( options['openJsCadPath'], baseurl );
+  }
+
+  var libraries = [];
+  if (options['libraries'] != null) {
+    libraries = options['libraries'];
+  }
+
   var workerscript = "";
   workerscript += script;
   workerscript += "\n\n\n\n//// The following code is added by OpenJsCad:\n";
-  workerscript += "var _csg_libraries=" + JSON.stringify(baselibraries)+";\n";
+  workerscript += "var _csg_baselibraries=" + JSON.stringify(baselibraries)+";\n";
+  workerscript += "var _csg_libraries=" + JSON.stringify(libraries)+";\n";
   workerscript += "var _csg_baseurl=" + JSON.stringify(baseurl)+";\n";
+  workerscript += "var _csg_openjscadurl=" + JSON.stringify(openjscadurl)+";\n";
   workerscript += "var _csg_makeAbsoluteURL=" + OpenJsCad.makeAbsoluteUrl.toString()+";\n";
 //  workerscript += "if(typeof(libs) == 'function') _csg_libraries = _csg_libraries.concat(libs());\n";
+  workerscript += "_csg_baselibraries = _csg_baselibraries.map(function(l){return _csg_makeAbsoluteURL(l,_csg_openjscadurl);});\n";
   workerscript += "_csg_libraries = _csg_libraries.map(function(l){return _csg_makeAbsoluteURL(l,_csg_baseurl);});\n";
+  workerscript += "_csg_baselibraries.map(function(l){importScripts(l)});\n";
   workerscript += "_csg_libraries.map(function(l){importScripts(l)});\n";
   workerscript += "self.addEventListener('message', function(e) {if(e.data && e.data.cmd == 'render'){";
   workerscript += "  OpenJsCad.runMainInWorker("+JSON.stringify(mainParameters)+");";
@@ -546,6 +561,7 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.script = null;
   this.hasError = false;
   this.debugging = false;
+  this.options = {};
   this.createElements();
 };
 
@@ -746,6 +762,17 @@ OpenJsCad.Processor.prototype = {
     this.errordiv.style.display = this.hasError? "block":"none";
     this.statusdiv.style.display = this.hasError? "none":"block";    
   },
+
+  setOpenJsCadPath: function(path) {
+    this.options[ 'openJsCadPath' ] = path;
+  },
+
+  addLibrary: function(lib) {
+    if( this.options[ 'libraries' ] == null ) {
+      this.options[ 'libraries' ] = [];
+    }
+    this.options[ 'libraries' ].push( lib );
+  },
   
   setError: function(txt) {
     this.hasError = (txt != "");
@@ -846,11 +873,13 @@ OpenJsCad.Processor.prototype = {
     var that = this;
     var paramValues = this.getParamValues();
     var useSync = this.debugging;
+    var options = {};
+
     if(!useSync)
     {
       try
       {
-        this.worker = OpenJsCad.parseJsCadScriptASync(this.script, paramValues, function(err, obj) {
+        this.worker = OpenJsCad.parseJsCadScriptASync(this.script, paramValues, this.options, function(err, obj) {
           that.processing = false;
           that.worker = null;
           if(err)
