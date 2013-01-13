@@ -1,6 +1,7 @@
 /*
 ## License
 
+Copyright (c) 2013 Eduard Bespalov (edwbes@gmail.com)
 Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl)
 Copyright (c) 2011 Evan Wallace (http://evanw.github.com/csg.js/)
 Copyright (c) 2012 Alexandre Girard (https://github.com/alx)
@@ -2160,7 +2161,7 @@ CSG.Vector3D.prototype = {
 	},
 
 	toString: function() {
-		return "(" + this._x + ", " + this._y + ", " + this._z + ")";
+		return "(" + this._x.toFixed(2) + ", " + this._y.toFixed(2) + ", " + this._z.toFixed(2) + ")";
 	},
 
 	// find a vector that is somewhat perpendicular to this one
@@ -3554,7 +3555,7 @@ CSG.Vector2D.prototype = {
 	},
 
 	toString: function() {
-		return "(" + this._x + ", " + this._y + ")";
+		return "("+this._x.toFixed(2)+", "+this._y.toFixed(2)+")";
 	}
 };
 
@@ -4926,6 +4927,10 @@ CAG.fromCompactBinary = function(bin) {
 	return cag;
 };
 
+function fnSortByIndex(a, b) {
+	return a.index - b.index;
+}
+
 CAG.prototype = {
 	toString: function() {
 		var result = "CAG (" + this.sides.length + " sides):\n";
@@ -5180,12 +5185,28 @@ CAG.prototype = {
 		return result;
 	},
 
-	// extruded=cag.extrude({offset: [0,0,10], twistangle: 360, twiststeps: 100});
-	// linear extrusion of 2D shape, with optional twist
-	// The 2d shape is placed in in z=0 plane and extruded into direction <offset> (a CSG.Vector3D)
-	// The final face is rotated <twistangle> degrees. Rotation is done around the origin of the 2d shape (i.e. x=0, y=0)
-	// twiststeps determines the resolution of the twist (should be >= 1)
-	// returns a CSG object
+	/**
+	 * extruded=cag.extrude({offset: [0,0,10], twistangle: 360, twiststeps: 100});
+	 * linear extrusion of 2D shape, with optional twist
+	 * The 2d shape is placed in in z=0 plane and extruded into direction <offset> (a CSG.Vector3D)
+	 * The final face is rotated <twistangle> degrees. Rotation is done around the origin of the 2d shape (i.e. x=0, y=0)
+	 * twiststeps determines the resolution of the twist (should be >= 1)
+	 * returns a CSG object
+	 *
+	 * Tedbeer: added optional transformation while extruding
+	 * New parameters:
+	 * {
+	 *   numslices - number of the extrusion cuts to generate while extruding,
+	 *               it's the same as twiststeps, so max(numslices, twiststeps) is used
+	 *   transform - function (cag, t, angle) - callback function is called for every generated cut
+	 *       @param cag - current generated polygon, can be transformed or replaced
+	 *       @param t - current level of extrusion, it's a number between [0..1],
+	 *                  0 - for the bottom, 1 - for the top
+	 *       @param angle - current twist angle
+	 *       @return - must return CAG - transformed initial cag or a new one
+	 * }
+	 *
+	 */
 	extrude: function(options) {
 		if(this.sides.length === 0) {
 			// empty!
@@ -5194,79 +5215,237 @@ CAG.prototype = {
 		var offsetvector = CSG.parseOptionAs3DVector(options, "offset", [0, 0, 1]);
 		var twistangle = CSG.parseOptionAsFloat(options, "twistangle", 0);
 		var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", 10);
+		//new extruding options
+		//number of slices for the custom transformation
+		var numslices = CSG.parseOptionAsInt(options, "numslices", 10);
+		var customTransform = CSG.parseOption(options, "transform", null);
 
-		if(twistangle === 0) twiststeps = 1;
-		if(twiststeps < 1) twiststeps = 1;
+		if (twiststeps < 1)
+			twiststeps = 1;
 
-		var newpolygons = [];
-		var prevtransformedcag;
-		var prevstepz;
-		for(var step = 0; step <= twiststeps; step++) {
-			var stepfraction = step / twiststeps;
-			var transformedcag = this;
-			var angle = twistangle * stepfraction;
-			if(angle !== 0) {
+		if (('twiststeps' in options) && ('numslices' in options)) {
+			numslices = Math.max(twiststeps, numslices);
+		}
+		//when there is no custom transforming and twisting - make extruding simple
+		if (twistangle == 0 && customTransform == null)
+			numslices = 1;
+
+		var newpolygons = [],
+			prevtransformedcag,
+			prevpoints,
+			prevstepZ,
+			translateVector2D = new CSG.Vector2D(offsetvector.x, offsetvector.y),
+			translatevector;
+		for(var step=0; step <= numslices; step++) {
+			var stepfraction = step / numslices,
+				transformedcag = this, points,
+				angle = twistangle * stepfraction;
+
+			if(angle != 0) {
 				transformedcag = transformedcag.rotateZ(angle);
 			}
-			var translatevector = new CSG.Vector2D(offsetvector.x, offsetvector.y).times(stepfraction);
+			translatevector = translateVector2D.times(stepfraction);
 			transformedcag = transformedcag.translate(translatevector);
-			var bounds = transformedcag.getBounds();
-			bounds[0] = bounds[0].minus(new CSG.Vector2D(1, 1));
-			bounds[1] = bounds[1].plus(new CSG.Vector2D(1, 1));
-			var stepz = offsetvector.z * stepfraction;
-			if((step === 0) || (step == twiststeps)) {
-				// bottom or top face:
-				var csgshell = transformedcag.toCSG(stepz - 1, stepz + 1);
-				var csgplane = CSG.fromPolygons([
-					new CSG.Polygon([
-						new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[0].y, stepz)),
-						new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[0].y, stepz)),
-						new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[1].y, stepz)),
-						new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[1].y, stepz))
-					])
-				]);
-				var flip = (step === 0);
-				if(offsetvector.z < 0) flip = !flip;
-				if(flip) {
-					csgplane = csgplane.inverse();
+			if (customTransform) {
+				//sides need to be ordered to get proper walls
+				transformedcag = customTransform(transformedcag, stepfraction, angle);
+				var vStart = transformedcag.sides[0].vertex0;
+				//TODO: multi path polygons extruding
+				points = transformedcag.getOutlinePaths()[0].points;
+				//rewind to the same start
+				for (var i = points.length; i > 0 && points[0] != vStart; i--) {
+					points.push(points.shift());
+				};
+				transformedcag = CAG.fromPoints(points);
+				points.push(points[0]); //close the path
+			}
+			var stepZ = offsetvector.z * stepfraction;
+
+			if ((step == 0) || (step == numslices)) {
+				var flip = (step == 0);
+				if(offsetvector.z < 0) {
+					flip = !flip;
 				}
-				csgplane = csgplane.intersect(csgshell);
-				// only keep the polygons in the z plane:
-				csgplane.polygons.map(function(polygon) {
-					if(Math.abs(polygon.plane.normal.z) > 0.99) {
-						newpolygons.push(polygon);
-					}
-				});
+				this._addFlats(newpolygons, transformedcag, stepZ, flip);
 			}
 			if(step > 0) {
-				var numsides = transformedcag.sides.length;
-				for(var sideindex = 0; sideindex < numsides; sideindex++) {
-					var thisside = transformedcag.sides[sideindex];
-					var prevside = prevtransformedcag.sides[sideindex];
-					var p1 = new CSG.Polygon([
-						new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
-						new CSG.Vertex(thisside.vertex0.pos.toVector3D(stepz)),
-						new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz))
-					]);
-					var p2 = new CSG.Polygon([
-						new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
-						new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz)),
-						new CSG.Vertex(prevside.vertex1.pos.toVector3D(prevstepz))
-					]);
-					if(offsetvector.z < 0) {
-						p1 = p1.flipped();
-						p2 = p2.flipped();
-					}
-					newpolygons.push(p1);
-					newpolygons.push(p2);
-				}
+				this._addWalls(newpolygons, prevpoints, prevstepZ, points, stepZ, offsetvector.z < 0);
 			}
 			prevtransformedcag = transformedcag;
-			prevstepz = stepz;
-		} // for step
+			prevpoints = points;
+			prevstepZ = stepZ;
+		}// for step
 		return CSG.fromPolygons(newpolygons);
 	},
+	//top and bottom sides
+	_VECTOR1x1: new CSG.Vector2D(1,1),
+	_addFlats: function(dest, cag, coorZ, bFlipped) {
+		var bounds = cag.getBounds();
+		bounds[0] = bounds[0].minus(this._VECTOR1x1);
+		bounds[1] = bounds[1].plus(this._VECTOR1x1);
+		// bottom or top face:
+		var csgshell = cag.toCSG(coorZ-1, coorZ+1);
+		var csgplane = CSG.fromPolygons([new CSG.Polygon([
+			new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[0].y, coorZ)),
+			new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[0].y, coorZ)),
+			new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[1].y, coorZ)),
+			new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[1].y, coorZ))
+		])]);
+		if(bFlipped) {
+			csgplane = csgplane.inverse();
+		}
+		csgplane = csgplane.intersect(csgshell);
+		// only keep the polygons in the z plane:
+		csgplane.polygons.map(function(polygon) {
+			if(Math.abs(polygon.plane.normal.z) > 0.99) {
+				dest.push(polygon);
+			}
+		});
+		return dest;
+	},
+	/** for extruding without transformation - almost no limits on CAG,
+	 * bottom and top sides must match to each other
+	 *
+	 * Tedbeer: experimental feature - extruding with transformation
+	 * @param {Array} walls Destination array where to push wall polygons
+	 * @param {Array} bottomPoints - Array of CSG.Vector2D, closed path
+	 * @param {Number} bottomZ - z coordinate of the bottom
+	 * @param {Array} topPoints - Array of CSG.Vector2D, closed path
+	 * @param {Number} topZ - z coordinate of the top
+	 * @param {Boolean} bFlipped - if extruding is up-side-down - polygons need to be flipped
+	 * top and bottom points must be in order,
+	 */
+	_addWalls: function(walls, bottomPoints, bottomZ, topPoints, topZ, bFlipped, bDraft) {
+		var iTopLen = topPoints.length - 1,
+			iBotLen = bottomPoints.length - 1,
+			iExtra = iTopLen - iBotLen, //how many extra triangles we need
+			bMoreTops = iExtra > 0,
+			bMoreBottoms = iExtra < 0;
 
+		var aMin = []; //indexes to start extra triangles (polygon with minimal square)
+		//init - we need exactly /iExtra/ small triangles
+		for (var i = Math.abs(iExtra); i > 0; i--) {
+			aMin.push({len: Infinity, index: -1});
+		}
+
+		var len;
+		if (bMoreBottoms) {
+			for (var i = 0; i < iBotLen; i++) {
+				len = (new CAG.Side(
+							new CAG.Vertex(bottomPoints[i]),
+							new CAG.Vertex(bottomPoints[i+1]))
+						).lengthSquared();
+				//find the element to replace
+				for (var j = aMin.length - 1; j >= 0; j--) {
+					if (aMin[j].len > len) {
+						aMin[j].len = len;
+						aMin.index = j;
+						break;
+					}
+				}//for
+			}
+		} else if (bMoreTops) {
+			for (var i = 0; i < iTopLen; i++) {
+				len = (new CAG.Side(
+							new CAG.Vertex(topPoints[i]),
+							new CAG.Vertex(topPoints[i+1]))
+						).lengthSquared();
+				//find the element to replace
+				for (var j = aMin.length - 1; j >= 0; j--) {
+					if (aMin[j].len > len) {
+						aMin[j].len = len;
+						aMin.index = j;
+						break;
+					}
+				}//for
+			}
+		}//if
+		//sort by index
+		aMin.sort(fnSortByIndex);
+		var getTriangle = function addWallsPutTriangle (pointA, pointB, pointC, color) {
+			var triangle = new CSG.Polygon([
+				new CSG.Vertex(pointA),
+				new CSG.Vertex(pointB),
+				new CSG.Vertex(pointC)
+			], color ? new CSG.Polygon.Shared(color) : null);
+			return bFlipped ? triangle.flipped() : triangle;
+		};
+
+		var bpoint = bottomPoints[0],
+			tpoint = topPoints[0],
+			secondPoint,
+			nBotFacet, nTopFacet; //length of triangle facet side
+		for (var iB = 0, iT = 0, iMax = iTopLen + iBotLen; iB + iT < iMax;) {
+			if (aMin.length) {
+				if (bMoreTops && iT == aMin[0].index) {//one vertex is on the bottom, 2 - on the top
+					secondPoint = topPoints[++iT];
+					//console.log('<<< extra top: ' + secondPoint + ', ' + tpoint + ', bottom: ' + bpoint);
+					walls.push(getTriangle(
+						secondPoint.toVector3D(topZ),
+						tpoint.toVector3D(topZ),
+						bpoint.toVector3D(bottomZ)
+						//TODO: color
+						//,[0,0.8,0]
+					));
+					tpoint = secondPoint;
+					aMin.shift();
+					continue;
+				} else if (bMoreBottoms && iB == aMin[0].index) {
+					secondPoint = bottomPoints[++iB];
+					walls.push(getTriangle(
+						tpoint.toVector3D(topZ),
+						bpoint.toVector3D(bottomZ),
+						secondPoint.toVector3D(bottomZ)
+						//TODO: color
+						//,[0,0.8,0]
+					));
+					bpoint = secondPoint;
+					aMin.shift();
+					continue;
+				}
+			}
+			//choose the shortest path
+			if (iB < iBotLen) { //one vertex is on the top, 2 - on the bottom
+				nBotFacet = (new CAG.Side(
+						new CAG.Vertex(tpoint),
+						new CAG.Vertex(bottomPoints[iB+1]))
+					).lengthSquared();
+			} else {
+				nBotFacet = Infinity;
+			}
+			if (iT < iTopLen) { //one vertex is on the bottom, 2 - on the top
+				nTopFacet = (new CAG.Side(
+						new CAG.Vertex(bpoint),
+						new CAG.Vertex(topPoints[iT+1]))
+					).lengthSquared();
+			} else {
+				nTopFacet = Infinity;
+			}
+			if (nBotFacet <= nTopFacet) {
+				secondPoint = bottomPoints[++iB];
+				walls.push(getTriangle(
+					tpoint.toVector3D(topZ),
+					bpoint.toVector3D(bottomZ),
+					secondPoint.toVector3D(bottomZ)
+					//TODO: color
+					//,i == 0 ? [0,0.8,0.8] : [0,0,0.8]
+				));
+				bpoint = secondPoint;
+			} else if (iT < iTopLen) { //nTopFacet < Infinity
+				secondPoint = topPoints[++iT];
+				//console.log('<<< top: ' + secondPoint + ', ' + tpoint + ', bottom: ' + bpoint);
+				walls.push(getTriangle(
+					secondPoint.toVector3D(topZ),
+					tpoint.toVector3D(topZ),
+					bpoint.toVector3D(bottomZ)
+					//TODO: color
+					//,i == 0 ? [0.8, 0.8, 0] : [0.8,0,0]
+				));
+				tpoint = secondPoint;
+			};
+		}
+		return walls;
+	},
 	// check if we are a valid CAG (for debugging)
 	check: function() {
 		var errors = [];
@@ -5466,6 +5645,9 @@ CAG.Vertex = function(pos) {
 };
 
 CAG.Vertex.prototype = {
+	toString: function() {
+		return "("+this.pos.x.toFixed(2)+","+this.pos.y.toFixed(2)+")";
+	},
 	getTag: function() {
 		var result = this.tag;
 		if(!result) {
@@ -5515,8 +5697,7 @@ CAG.Side.fromFakePolygon = function(polygon) {
 
 CAG.Side.prototype = {
 	toString: function() {
-		return "(" + this.vertex0.pos.x + "," + this.vertex0.pos.y +
-				") -> (" + this.vertex1.pos.x + "," + this.vertex1.pos.y + ")";
+		return this.vertex0 + " -> "+ this.vertex1;
 	},
 
 	toPolygon3D: function(z0, z1) {
@@ -5550,6 +5731,16 @@ CAG.Side.prototype = {
 			this.tag = result;
 		}
 		return result;
+	},
+
+	lengthSquared: function() {
+		var x = this.vertex1.pos.x - this.vertex0.pos.x,
+		y = this.vertex1.pos.y - this.vertex0.pos.y;
+		return x*x + y*y;
+	},
+
+	length: function() {
+		return Math.sqrt(this.lengthSquared());
 	}
 };
 
