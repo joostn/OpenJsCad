@@ -5249,21 +5249,16 @@ CAG.prototype = {
 			if (customTransform) {
 				//sides need to be ordered to get proper walls
 				transformedcag = customTransform(transformedcag, stepfraction, angle);
-			
-				var vStart = transformedcag.sides[0].vertex0;
-				//TODO: multi path polygons extruding
-				points = transformedcag.getOutlinePaths()[0].points;
-				//rewind to the same start
-				for (var i = points.length; i > 0 && points[0] != vStart; i--) {
-					points.push(points.shift());
-				};
-				transformedcag = CAG.fromPoints(points);
-				points.push(points[0]); //close the path
 			}
-			else
-			{
-				points = transformedcag.getOutlinePaths()[0].points;				
-			}
+			var vStart = transformedcag.sides[0].vertex0;
+			//TODO: multi path polygons extruding
+			points = transformedcag.getOutlinePaths()[0].points;
+			//rewind to the same start
+			for (var i = points.length; i > 0 && points[0] != vStart; i--) {
+				points.push(points.shift());
+			};
+			transformedcag = CAG.fromPoints(points);
+			points.push(points[0]); //close the path
 			var stepZ = offsetvector.z * stepfraction;
 
 			if ((step == 0) || (step == numslices)) {
