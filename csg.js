@@ -5249,6 +5249,7 @@ CAG.prototype = {
 			if (customTransform) {
 				//sides need to be ordered to get proper walls
 				transformedcag = customTransform(transformedcag, stepfraction, angle);
+			
 				var vStart = transformedcag.sides[0].vertex0;
 				//TODO: multi path polygons extruding
 				points = transformedcag.getOutlinePaths()[0].points;
@@ -5258,6 +5259,10 @@ CAG.prototype = {
 				};
 				transformedcag = CAG.fromPoints(points);
 				points.push(points[0]); //close the path
+			}
+			else
+			{
+				points = transformedcag.getOutlinePaths()[0].points;				
 			}
 			var stepZ = offsetvector.z * stepfraction;
 
