@@ -1524,8 +1524,8 @@ CSG.parseOptionAsBool = function(options, optionname, defaultvalue) {
 	var result = CSG.parseOption(options, optionname, defaultvalue);
 	if(typeof(result) == "string") {
 		if(result == "true") result = true;
-		if(result == "false") result = false;
-		if(result === 0) result = false;
+		else if(result == "false") result = false;
+		else if(result == 0) result = false;
 	}
 	result = !! result;
 	return result;
