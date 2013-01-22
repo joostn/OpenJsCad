@@ -1509,7 +1509,7 @@ CSG.parseOptionAsFloat = function(options, optionname, defaultvalue) {
 	if(typeof(result) == "string") {
 		result = Number(result);
 	}
-	if(typeof(result) != "number") {
+	if(isNaN(result) || typeof(result) != "number") {
 		throw new Error("Parameter " + optionname + " should be a number");
 	}
 	return result;
@@ -1517,7 +1517,11 @@ CSG.parseOptionAsFloat = function(options, optionname, defaultvalue) {
 
 CSG.parseOptionAsInt = function(options, optionname, defaultvalue) {
 	var result = CSG.parseOption(options, optionname, defaultvalue);
-	return Number(Math.floor(result));
+	result = Number(Math.floor(result));
+	if (isNaN(result)) {
+		throw new Error("Parameter " + optionname + " should be a number");
+	}
+	return result;
 };
 
 CSG.parseOptionAsBool = function(options, optionname, defaultvalue) {
