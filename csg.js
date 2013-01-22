@@ -1508,7 +1508,8 @@ CSG.parseOptionAsFloat = function(options, optionname, defaultvalue) {
 	var result = CSG.parseOption(options, optionname, defaultvalue);
 	if(typeof(result) == "string") {
 		result = Number(result);
-	} else if(typeof(result) != "number") {
+	}
+	if(typeof(result) != "number") {
 		throw new Error("Parameter " + optionname + " should be a number");
 	}
 	return result;
@@ -5200,10 +5201,10 @@ CAG.prototype = {
     var offsetvector = CSG.parseOptionAs3DVector(options, "offset", [0,0,1]);
     var twistangle = CSG.parseOptionAsFloat(options, "twistangle", 0);
     var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", 10);
-    
+
     if(twistangle == 0) twiststeps = 1;
     if(twiststeps < 1) twiststeps = 1;
-    
+
     var newpolygons = [];
     var prevtransformedcag;
     var prevstepz;
@@ -5281,7 +5282,7 @@ CAG.prototype = {
 
 	/**
 	 * Extrude with custom transformation. Still buggy: may return non-watertight solids.
-	 * 
+	 *
 	 * extruded=cag.extrude({offset: [0,0,10], twistangle: 360, twiststeps: 100});
 	 * linear extrusion of 2D shape, with optional twist
 	 * The 2d shape is placed in in z=0 plane and extruded into direction <offset> (a CSG.Vector3D)
