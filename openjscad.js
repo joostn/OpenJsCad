@@ -124,13 +124,13 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
 
 OpenJsCad.Viewer.prototype = {
   setCsg: function(csg) {
-    this.mesh = OpenJsCad.Viewer.csgToMesh(csg);
+    this.meshes = OpenJsCad.Viewer.csgToMeshes(csg);
     this.onDraw();    
   },
 
   clear: function() {
-    // empty mesh:
-    this.mesh = new GL.Mesh();
+    // empty mesh list:
+    this.meshes = []; 
     this.onDraw();    
   },
 
@@ -189,14 +189,20 @@ OpenJsCad.Viewer.prototype = {
     gl.rotate(this.angleZ, 0, 0, 1);
 
     if (!this.lineOverlay) gl.enable(gl.POLYGON_OFFSET_FILL);
-    this.lightingShader.draw(this.mesh, gl.TRIANGLES);
+    for (var i = 0; i < this.meshes.length; i++) {  
+      var mesh = this.meshes[i];
+      this.lightingShader.draw(mesh, gl.TRIANGLES);
+    }
     if (!this.lineOverlay) gl.disable(gl.POLYGON_OFFSET_FILL);
 
     if(this.drawLines)
     {
       if (this.lineOverlay) gl.disable(gl.DEPTH_TEST);
       gl.enable(gl.BLEND);
-      this.blackShader.draw(this.mesh, gl.LINES);
+      for (var i = 0; i < this.meshes.length; i++) {  
+        var mesh = this.meshes[i];
+        this.blackShader.draw(mesh, gl.LINES);
+      }
       gl.disable(gl.BLEND);
       if (this.lineOverlay) gl.enable(gl.DEPTH_TEST);
     }
@@ -236,10 +242,12 @@ OpenJsCad.Viewer.prototype = {
   }
 }
 
-// Convert from CSG solid to GL.Mesh object
-OpenJsCad.Viewer.csgToMesh = function(csg) {
+// Convert from CSG solid to an array of GL.Mesh objects
+// limiting the number of vertices per mesh to less than 2^16
+OpenJsCad.Viewer.csgToMeshes = function(csg) {
   var csg = csg.canonicalized();
   var mesh = new GL.Mesh({ normals: true, colors: true });
+  var meshes = [ mesh ];
   var vertexTag2Index = {};
   var vertices = [];
   var colors = [];
@@ -277,13 +285,29 @@ OpenJsCad.Viewer.csgToMesh = function(csg) {
     for (var i = 2; i < indices.length; i++) {
       triangles.push([indices[0], indices[i - 1], indices[i]]);
     }
+    // if too many vertices, start a new mesh;
+    if (vertices.length > 65000) {
+      // finalize the old mesh	
+      mesh.triangles = triangles;
+      mesh.vertices = vertices;
+      mesh.colors = colors;
+      mesh.computeWireframe();
+      mesh.computeNormals();
+      // start a new mesh
+      mesh = new GL.Mesh({ normals: true, colors: true });
+      triangles = [];
+      colors = [];
+      vertices = [];
+      meshes.push(mesh);	
+    }
   }
+  // finalize last mesh
   mesh.triangles = triangles;
   mesh.vertices = vertices;
   mesh.colors = colors;
   mesh.computeWireframe();
   mesh.computeNormals();
-  return mesh;
+  return meshes;
 };
 
 // this is a bit of a hack; doesn't properly supports urls that start with '/'
