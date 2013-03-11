@@ -1,6 +1,6 @@
 # OpenJsCad
 
-Enthousiastic about OpenSCAD but somewhat frustrated by the limitations of its language, here is an alternative using Javascript. It's free, completely open source, still seriously under construction, based on Evan Wallace's CSG.js library and can be used from within a WebGL supporting browser. Currently Chrome and Firefox work well.
+Enthusiastic about OpenSCAD but somewhat frustrated by the limitations of its language, here is an alternative using Javascript. It's free, completely open source, still seriously under construction, based on Evan Wallace's CSG.js library and can be used from within a WebGL supporting browser. Currently Chrome and Firefox work well.
 
 To use OpenJsCad go to: http://joostn.github.com/OpenJsCad/
 
