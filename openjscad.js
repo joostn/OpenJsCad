@@ -881,6 +881,10 @@ OpenJsCad.Processor.prototype = {
       {
         value = control.options[control.selectedIndex].value;
       }
+      else if(type == "bool")
+      {
+        value = control.checked;
+      }
       paramValues[paramdef.name] = value;
     }
     return paramValues;
@@ -1126,7 +1130,7 @@ OpenJsCad.Processor.prototype = {
       {
         type = paramdef.type;
       }
-      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") )
+      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") && (type !== "bool") )
       {
         throw new Error(errorprefix + "Unknown parameter type '"+type+"'");
       }
@@ -1191,6 +1195,23 @@ OpenJsCad.Processor.prototype = {
         {
           control.selectedIndex = selectedindex;
         }        
+      }
+      else if(type == "bool")
+      {
+        control = document.createElement("input");
+        control.type = "checkbox";
+        if('default' in paramdef)
+        {
+          if(typeof(paramdef.default) != "boolean")
+          {
+            throw new Error(errorprefix + "'default' of type 'bool' has to be boolean (true/false)");
+          }
+          control.checked = paramdef.default;
+        }
+        else
+        {
+          control.checked = false;
+        }
       }
       paramControls.push(control);
       var tr = document.createElement("tr");
