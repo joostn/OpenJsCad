@@ -857,7 +857,7 @@ OpenJsCad.Processor.prototype = {
       }
       var control = this.paramControls[i];
       var value;
-      if( (type == "text") || (type == "float") || (type == "int") )
+      if( (type == "text") || (type == "longtext") || (type == "float") || (type == "int") )
       {
         value = control.value;
         if( (type == "float") || (type == "int") )
@@ -1130,7 +1130,7 @@ OpenJsCad.Processor.prototype = {
       {
         type = paramdef.type;
       }
-      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") && (type !== "bool") )
+      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") && (type !== "longtext") && (type !== "bool") )
       {
         throw new Error(errorprefix + "Unknown parameter type '"+type+"'");
       }
@@ -1195,6 +1195,18 @@ OpenJsCad.Processor.prototype = {
         {
           control.selectedIndex = selectedindex;
         }        
+      }
+      else if(type == "longtext")
+      {
+        control = document.createElement("textarea");
+        if('default' in paramdef)
+        {
+          control.value = paramdef.default;
+        }
+        else
+        {
+          control.value = "";
+        }
       }
       else if(type == "bool")
       {
