@@ -491,7 +491,7 @@ OpenJsCad.getWindowURL = function() {
 
 OpenJsCad.textToBlobUrl = function(txt) {
   var windowURL=OpenJsCad.getWindowURL();
-  var blob = new Blob([txt]);
+  var blob = new Blob([txt], { "type" : "application/javascript" });
   var blobURL = windowURL.createObjectURL(blob)
   if(!blobURL) throw new Error("createObjectURL() failed"); 
   return blobURL;
@@ -857,7 +857,7 @@ OpenJsCad.Processor.prototype = {
       }
       var control = this.paramControls[i];
       var value;
-      if( (type == "text") || (type == "float") || (type == "int") )
+      if( (type == "text") || (type == "longtext") || (type == "float") || (type == "int") )
       {
         value = control.value;
         if( (type == "float") || (type == "int") )
@@ -880,6 +880,10 @@ OpenJsCad.Processor.prototype = {
       else if(type == "choice")
       {
         value = control.options[control.selectedIndex].value;
+      }
+      else if(type == "bool")
+      {
+        value = control.checked;
       }
       paramValues[paramdef.name] = value;
     }
@@ -1126,7 +1130,7 @@ OpenJsCad.Processor.prototype = {
       {
         type = paramdef.type;
       }
-      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") )
+      if( (type !== "text") && (type !== "int") && (type !== "float") && (type !== "choice") && (type !== "longtext") && (type !== "bool") )
       {
         throw new Error(errorprefix + "Unknown parameter type '"+type+"'");
       }
@@ -1191,6 +1195,35 @@ OpenJsCad.Processor.prototype = {
         {
           control.selectedIndex = selectedindex;
         }        
+      }
+      else if(type == "longtext")
+      {
+        control = document.createElement("textarea");
+        if('default' in paramdef)
+        {
+          control.value = paramdef.default;
+        }
+        else
+        {
+          control.value = "";
+        }
+      }
+      else if(type == "bool")
+      {
+        control = document.createElement("input");
+        control.type = "checkbox";
+        if('default' in paramdef)
+        {
+          if(typeof(paramdef.default) != "boolean")
+          {
+            throw new Error(errorprefix + "'default' of type 'bool' has to be boolean (true/false)");
+          }
+          control.checked = paramdef.default;
+        }
+        else
+        {
+          control.checked = false;
+        }
       }
       paramControls.push(control);
       var tr = document.createElement("tr");
