@@ -1233,6 +1233,10 @@ OpenJsCad.Processor.prototype = {
       {
         label = paramdef.caption;
       }
+      if('visible' in paramdef)
+      {
+        tr.style.display = (paramdef.visible) ? "table-row" : "none";
+      }
        
       td.innerHTML = label;
       tr.appendChild(td);
