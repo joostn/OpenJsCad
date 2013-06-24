@@ -1139,9 +1139,13 @@ OpenJsCad.Processor.prototype = {
       {
         control = document.createElement("input");
         control.type = "text";
-        if('default' in paramdef)
+        if('initial' in paramdef)
         {
-          control.value = paramdef.default;
+          control.value = paramdef.initial;
+        }
+        else if('default' in paramdef)
+        {
+          control.value = paramdef['default'];
         }
         else
         {
