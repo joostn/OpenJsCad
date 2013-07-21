@@ -4852,8 +4852,9 @@ CSG.Path2D.prototype = {
 
 	appendPoint: function(point) {
 		if(this.closed) {
-			throw new Error("Paths must not be closed");
+			throw new Error("Path must not be closed");
 		}
+		point = new CSG.Vector2D(point); // cast to Vector2D
 		var newpoints = this.points.concat([point]);
 		return new CSG.Path2D(newpoints);
 	},
