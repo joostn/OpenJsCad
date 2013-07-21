@@ -4921,7 +4921,138 @@ CSG.Path2D.prototype = {
 			return point.multiply4x4(matrix4x4);
 		});
 		return new CSG.Path2D(newpoints, this.closed);
-	}
+	},
+
+	appendBezier: function(controlpoints, options) {
+		if(arguments.length < 2)
+		{
+			options = {};
+		}
+		if(this.closed) {
+			throw new Error("Path must not be closed");
+		}
+		if(!(controlpoints instanceof Array))
+		{
+			throw new Error("appendBezier: should pass an array of control points")
+		}
+		if(controlpoints.length < 1)
+		{
+			throw new Error("appendBezier: need at least 1 control point")			
+		}
+		if(this.points.length < 1) {
+			throw new Error("appendBezier: path must already contain a point (the endpoint of the path is used as the starting point for the bezier curve)");
+		}
+		var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution2D);
+		if(resolution < 4) resolution = 4;
+		var factorials = [];
+		var controlpoints_parsed = [];
+		controlpoints_parsed.push(this.points[this.points.length - 1]); // start at the previous end point
+		for(var i=0; i < controlpoints.length; ++i) {
+			var p = controlpoints[i];
+			if(p === null)
+			{
+				// we can pass null as the first control point. In that case a smooth gradient is ensured:
+				if(i != 0)
+				{
+					throw new Error("appendBezier: null can only be passed as the first control point");
+				}
+				if(controlpoints.length < 2)
+				{
+					throw new Error("appendBezier: null can only be passed if there is at least one more control point");					
+				}
+				var lastBezierControlPoint;
+				if('lastBezierControlPoint' in this)
+				{
+					lastBezierControlPoint = this.lastBezierControlPoint;
+				}
+				else
+				{
+					if(this.points.length < 2)
+					{
+						throw new Error("appendBezier: null is passed as a control point but this requires a previous bezier curve or at least two points in the existing path");
+					}
+					lastBezierControlPoint = this.points[this.points.length - 2];
+				}
+				// mirror the last bezier control point:
+				p = this.points[this.points.length - 1].times(2).minus(lastBezierControlPoint);
+			}
+			else
+			{
+				p = new CSG.Vector2D(p); // cast to Vector2D
+			}
+			controlpoints_parsed.push(p);
+		}
+		var bezier_order = controlpoints_parsed.length - 1;
+		var fact = 1;
+		for(var i = 0; i <= bezier_order; ++i) {
+			if(i > 0) fact *= i;
+			factorials.push(fact);
+		}
+		var binomials = [];
+		for(var i = 0; i <= bezier_order; ++i) {
+			var binomial = factorials[bezier_order] / (factorials[i] * factorials[bezier_order-i]);
+			binomials.push(binomial);
+		}
+		var getPointForT = function(t)
+		{
+			var t_k = 1;                // = pow(t,k)
+			var one_minus_t_n_minus_k =  Math.pow(1-t, bezier_order); // = pow( 1-t, bezier_order - k)
+			var inv_1_minus_t = (t != 1)? (1/(1-t)) : 1;
+			var point = new CSG.Vector2D(0,0);
+			for(var k = 0; k <= bezier_order; ++k) {
+				if(k == bezier_order) one_minus_t_n_minus_k = 1;
+				var bernstein_coefficient = binomials[k] * t_k * one_minus_t_n_minus_k; 
+				point = point.plus(controlpoints_parsed[k].times(bernstein_coefficient));
+				t_k *= t;
+				one_minus_t_n_minus_k *= inv_1_minus_t;
+			}
+			return point;
+		};
+		var newpoints = [];
+		var newpoints_t = [];
+		var numsteps = bezier_order + 1;
+		for(var i = 0; i < numsteps; ++i) {
+			var t = i / (numsteps - 1);
+			var point = getPointForT(t);
+			newpoints.push(point);
+			newpoints_t.push(t);
+		}
+		// subdivide each segment until the angle at each vertex becomes small enough:
+		var subdivide_base=1;
+		var maxangle = Math.PI * 2 / resolution; // segments may have differ no more in angle than this
+		var maxsinangle = Math.sin(maxangle);
+		while(subdivide_base < newpoints.length-1)
+		{
+			var dir1 = newpoints[subdivide_base].minus(newpoints[subdivide_base-1]).unit();
+			var dir2 = newpoints[subdivide_base+1].minus(newpoints[subdivide_base]).unit();
+			var sinangle = dir1.cross(dir2); // this is the sine of the angle
+			if(Math.abs(sinangle) > maxsinangle)
+			{
+				// angle is too big, we need to subdivide
+				var t0 = newpoints_t[subdivide_base-1];
+				var t1 = newpoints_t[subdivide_base+1];
+				var t0_new = t0 + (t1 - t0) * 1 / 3;
+				var t1_new = t0 + (t1 - t0) * 2 / 3;
+				var point0_new = getPointForT(t0_new);
+				var point1_new = getPointForT(t1_new);
+				// remove the point at subdivide_base and replace with 2 new points:
+				newpoints.splice(subdivide_base, 1, point0_new, point1_new);
+				newpoints_t.splice(subdivide_base, 1, t0_new, t1_new);
+				// re - evaluate the angles, starting at the previous junction since it has changed:
+				subdivide_base--;
+				if(subdivide_base < 1) subdivide_base = 1;
+			}
+			else
+			{
+				++subdivide_base;
+			}
+		}
+		// append to the previous points, but skip the first new point because it is identical to the last point:
+		newpoints = this.points.concat(newpoints.slice(1));
+		var result = new CSG.Path2D(newpoints);
+		result.lastBezierControlPoint = controlpoints_parsed[controlpoints_parsed.length - 2];
+		return result;
+	},
 };
 
 // Add several convenience methods to the classes that support a transform() method:

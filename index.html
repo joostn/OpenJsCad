@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 
 <html><head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
   <script src="lightgl.js"></script>
   <script src="csg.js"></script>
   <script src="openjscad.js"></script>
@@ -548,9 +549,6 @@ thick.</li>
 <li>innerToCAG() creates a CAG bounded by the path. The path should be a closed path.</li>
 </ul>
 
-<li>
-
-
 Creating a 3D solid is currently supported by the rectangularExtrude() function. This creates a 3D shape
 by following the path with a 2D rectangle (upright, perpendicular to the path direction).
 <pre>
@@ -581,6 +579,52 @@ var curvedpath = CSG.Path2D.arc({
 var csg = path.rectangularExtrude(3, 4, 16, true);
 return csg;
 </pre>
+
+<h2>2D Bézier curves</h2>
+Smooth 2D shapes can be constructed using CSG.Path2D's appendBezier() method. A Bézier curve is a smooth line between
+two endpoints, guided by control points. The curve in general only passes through the endpoints. The intermediate control points guide the
+curve in a certain direction but the curve in general does not go through the intermediate control points.
+In vector image editing applications (such as Inkscape) usually cubic Bézier are used: such a curve has two control points inbetween the 
+two endpoints. But in fact appendBezier() supports any order Bézier curve.
+<pre>
+path2d.appendBezier(controlpoints[, options]) - create a single Bézier segment
+
+controlpoints: an array of control points. Each control point is a 2d coordinate (can be an [x,y] array 
+  or a CSG.Vector2D). The Bézier curve starts at the last point in the existing path2d (hence path2d must
+  not be empty), and ends at the last given control point. Other control points are intermediate control points.
+  The first control point may be null. In that case a smooth transition is ensured: the null control 
+  point is replaced by the second last control point of the previous Bézier curve mirrored into the
+  starting point of this curve. In other words the incoming gradient matches the outgoing gradient at 
+  the current starting point.
+
+options: an optional object. Currently only one option is supported:
+  resolution: controls the smoothness of the curve: at least this number of segments will be used per 
+  360 degree rotation. If omitted, CSG.defaultResolution2D will be used.
+</pre>
+An example:
+<pre>
+var path=new CSG.Path2D([[0,0]]);  // beware of the double array: we must pass an array of 2d coordinates
+
+// bezier curve from [0,0] to [10,10]
+// with 3 intermediate control points so it is a 3rd order bezier
+// Since we do not give a resolution option, CSG.defaultResolution2D is used to determine the number of vertices
+path = path.appendBezier([[2,8], [5,0], [8,6], [10,10]]);
+
+// cubic bezier curve from [10,10] to [10,0]
+// first control point is null: this forces a smooth transition from the previous bezier curve
+// In this case the null control point will be replaced by [10,10]+([10,10]-[8,6]) = [12,14]
+// i.e. the last control point will be mirrored
+// Here we give the optional options object, setting a resolution of 24 steps per 360 degree of revolution
+// So the angle between each subsequent side is guaranteed to be less than 15 degrees
+path = path.appendBezier([null, [10,0]], {resolution: 24});
+
+// close the path and convert to a solid 2D shape:
+path = path.close();
+var cag = path.innerToCAG();
+
+return cag;
+</pre>
+
 
 <h2>Interactive parametric models</h2>
 It is possible to make certain parameters
