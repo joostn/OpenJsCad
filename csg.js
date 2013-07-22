@@ -1555,8 +1555,25 @@ CSG.parseOptionAsBool = function(options, optionname, defaultvalue) {
 //       radius: 1
 //     });
 CSG.cube = function(options) {
-	var c = CSG.parseOptionAs3DVector(options, "center", [0, 0, 0]);
-	var r = CSG.parseOptionAs3DVector(options, "radius", [1, 1, 1]);
+	var c,r;
+	options = options || {};
+	if( ('corner1' in options) || ('corner2' in options) )
+	{
+		if( ('center' in options) || ('radius' in options) )
+		{
+			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+		}
+		corner1 = CSG.parseOptionAs3DVector(options, "corner1", [0, 0, 0]);
+		corner2 = CSG.parseOptionAs3DVector(options, "corner2", [1, 1, 1]);
+		c = corner1.plus(corner2).times(0.5);
+		r = corner2.minus(corner1).times(0.5);
+	}
+	else
+	{
+		c = CSG.parseOptionAs3DVector(options, "center", [0, 0, 0]);
+		r = CSG.parseOptionAs3DVector(options, "radius", [1, 1, 1]);
+	}
+	r = r.abs(); // negative radii make no sense
 	var result = CSG.fromPolygons([
 		[
 			[0, 4, 6, 2],
@@ -1869,8 +1886,25 @@ CSG.roundedCylinder = function(options) {
 //       resolution: 8,
 //     });
 CSG.roundedCube = function(options) {
-	var center = CSG.parseOptionAs3DVector(options, "center", [0, 0, 0]);
-	var cuberadius = CSG.parseOptionAs3DVector(options, "radius", [1, 1, 1]);
+	var center,cuberadius;
+	options = options || {};
+	if( ('corner1' in options) || ('corner2' in options) )
+	{
+		if( ('center' in options) || ('radius' in options) )
+		{
+			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+		}
+		corner1 = CSG.parseOptionAs3DVector(options, "corner1", [0, 0, 0]);
+		corner2 = CSG.parseOptionAs3DVector(options, "corner2", [1, 1, 1]);
+		center = corner1.plus(corner2).times(0.5);
+		cuberadius = corner2.minus(corner1).times(0.5);
+	}
+	else
+	{
+		center = CSG.parseOptionAs3DVector(options, "center", [0, 0, 0]);
+		cuberadius = CSG.parseOptionAs3DVector(options, "radius", [1, 1, 1]);
+	}
+	cuberadius = cuberadius.abs(); // negative radii make no sense
 	var resolution = CSG.parseOptionAsFloat(options, "resolution", CSG.defaultResolution3D);
 	if(resolution < 4) resolution = 4;
 	var roundradius = CSG.parseOptionAsFloat(options, "roundradius", 0.2);
@@ -5229,8 +5263,24 @@ CAG.circle = function(options) {
 */
 CAG.rectangle = function(options) {
 	options = options || {};
-	var c = CSG.parseOptionAs2DVector(options, "center", [0, 0]);
-	var r = CSG.parseOptionAs2DVector(options, "radius", [1, 1]);
+	var c,r;
+	if( ('corner1' in options) || ('corner2' in options) )
+	{
+		if( ('center' in options) || ('radius' in options) )
+		{
+			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+		}
+		corner1 = CSG.parseOptionAs2DVector(options, "corner1", [0, 0]);
+		corner2 = CSG.parseOptionAs2DVector(options, "corner2", [1, 1]);
+		c = corner1.plus(corner2).times(0.5);
+		r = corner2.minus(corner1).times(0.5);
+	}
+	else
+	{
+		c = CSG.parseOptionAs2DVector(options, "center", [0, 0]);
+		r = CSG.parseOptionAs2DVector(options, "radius", [1, 1]);
+	}
+	r = r.abs(); // negative radii make no sense
 	var rswap = new CSG.Vector2D(r.x, -r.y);
 	var points = [
 	c.plus(r), c.plus(rswap), c.minus(r), c.minus(rswap)];
@@ -5245,8 +5295,24 @@ CAG.rectangle = function(options) {
 //     });
 CAG.roundedRectangle = function(options) {
 	options = options || {};
-	var center = CSG.parseOptionAs2DVector(options, "center", [0, 0]);
-	var radius = CSG.parseOptionAs2DVector(options, "radius", [1, 1]);
+	var center,radius;
+	if( ('corner1' in options) || ('corner2' in options) )
+	{
+		if( ('center' in options) || ('radius' in options) )
+		{
+			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+		}
+		corner1 = CSG.parseOptionAs2DVector(options, "corner1", [0, 0]);
+		corner2 = CSG.parseOptionAs2DVector(options, "corner2", [1, 1]);
+		center = corner1.plus(corner2).times(0.5);
+		radius = corner2.minus(corner1).times(0.5);
+	}
+	else
+	{
+		center = CSG.parseOptionAs2DVector(options, "center", [0, 0]);
+		radius = CSG.parseOptionAs2DVector(options, "radius", [1, 1]);
+	}
+	radius = radius.abs(); // negative radii make no sense
 	var roundradius = CSG.parseOptionAsFloat(options, "roundradius", 0.2);
 	var resolution = CSG.parseOptionAsFloat(options, "resolution", CSG.defaultResolution2D);
 	var maxroundradius = Math.min(radius.x, radius.y);

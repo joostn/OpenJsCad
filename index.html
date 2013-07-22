@@ -171,11 +171,17 @@ var cube = CSG.cube({
   radius: [1, 1, 1]
 });
 
+// or alternatively by specifying two diagonally opposite corners:
+var cube = CSG.cube({
+  corner1: [-10, 5, 10],
+  corner2: [10, -5, 1]
+});
+
 // a sphere:
 var sphere = CSG.sphere({
   center: [0, 0, 0],
   radius: 2,            // must be scalar
-  resolution: 32
+  resolution: 32        // optional
 });
 
 // a cylinder:
@@ -183,7 +189,7 @@ var cylinder = CSG.cylinder({
   start: [0, -1, 0],
   end: [0, 1, 0],
   radius: 1,
-  resolution: 16
+  resolution: 16        // optional
 });
 
 // a cone:
@@ -192,7 +198,7 @@ var cone = CSG.cylinder({
   end: [0, 1, 0],
   radiusStart: 1,
   radiusEnd: 2,
-  resolution: 16
+  resolution: 16        // optional
 });
 
 // like a cylinder, but with spherical endpoints:
@@ -200,16 +206,18 @@ var roundedCylinder = CSG.roundedCylinder({
   start: [0, -1, 0],
   end: [0, 1, 0],
   radius: 1,
-  resolution: 16
+  resolution: 16        // optional
 });
 
 // a rounded cube:
 var cube = CSG.roundedCube({
-  center: [0, 0, 0],
-  radius: 1,
-  roundradius: 0.2,
-  resolution: 8,
+  corner1: [-10, 5, 10],
+  corner2: [10, -5, 1]
+  roundradius: 3,
+  resolution: 8,        // optional
 });
+
+// or alternatively by specifying two diagonally opposite corners:
 </pre>
  
 <h2>CSG operations</h2>
@@ -505,7 +513,9 @@ var shape1 = CAG.fromPoints([[0,0], [5,0], [3,5], [0,5]]);
 // 2D primitives:
 var shape2 = CAG.circle({center: [-2, -2], radius: 4, resolution: 20});
 var shape3 = CAG.rectangle({center: [5, -2], radius: [2, 3]});
-var shape4 = CAG.roundedRectangle({center: [5, 7], radius: [4, 4], roundradius: 1, resolution: 24});
+var shape4 = CAG.rectangle({corner1: [-10, 20], corner2: [15, -30]});
+var shape5 = CAG.roundedRectangle({center: [5, 7], radius: [4, 4], roundradius: 1, resolution: 24});
+var shape6 = CAG.roundedRectangle({corner1: [-2, 3], corner2: [4, -4], roundradius: 1, resolution: 24});
 
 // Expand one of the shapes: first parameter is expand radius, second is the resolution:
 shape1 = shape1.expand(1, 20);
