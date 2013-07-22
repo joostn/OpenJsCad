@@ -571,13 +571,45 @@ path = path.close(); // close the path
 // of course we could simply have done:
 // var path = new CSG.Path2D([[10,10], [-10,10], [-10,-10], [10,-10]], /* closed = */ true);
 
-// We can make arcs and circles:
+// We can make arcs and circles. Two methods are provided:
+// arc() creates an circular segment with a specified center and radius:
 var curvedpath = CSG.Path2D.arc({
   center: [0,0,0],
   radius: 10,
   startangle: 0,
   endangle: 180,
   resolution: 16,
+});
+
+// or appendArc() can be used to create a circular or elliptical segment between two endpoints.
+// appendArc() closely follows the SVG arc specification:
+// http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+// The starting point for the arc is the current endpoint of the path
+// path2d = path2d.appendArc(endpoint, options);
+// endpoint is the destination coordinate
+// options:
+//      .resolution      // smoothness of the arc (number of segments per 360 degree of rotation)
+// to create a circular arc:
+//      .radius
+// to create an elliptical arc:
+//      .xradius
+//      .yradius
+//      .xaxisrotation   // the rotation (in degrees) of the x axis of the ellipse with respect 
+//                       // to the x axis of our coordinate system
+// this still leaves 4 possible arcs between the two given points. The following two flags select which one we draw:
+//      .clockwise       // = true | false (default is false). Two of the 4 solutions draw clockwise with respect to 
+//                       // the center point, the other 2 counterclockwise
+//      .large           // = true | false (default is false). Two of the 4 solutions are an arc longer than 180 
+//                       // degrees, the other two are <= 180 degrees
+var curvedpath2 = new CSG.Path2D([[0,0], [10,0]]); 
+// create an elliptical arc from [10,0] to [15,0]:
+curvedpath2 = curvedpath2.appendArc([15,0], {
+  xradius: 4,
+  yradius: -6,
+  xaxisrotation: 30,
+  resolution: 48,
+  clockwise: false,
+  large: true,
 });
 
 // Extrude the path by following it with a rectangle (upright, perpendicular to the path direction)

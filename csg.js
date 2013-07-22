@@ -5091,6 +5091,124 @@ CSG.Path2D.prototype = {
 		result.lastBezierControlPoint = controlpoints_parsed[controlpoints_parsed.length - 2];
 		return result;
 	},
+
+	/*
+		options:
+			.resolution // smoothness of the arc (number of segments per 360 degree of rotation)
+			// to create a circular arc:
+			.radius
+			// to create an elliptical arc:
+			.xradius
+			.yradius
+			.xaxisrotation  // the rotation (in degrees) of the x axis of the ellipse with respect to the x axis of our coordinate system
+			// this still leaves 4 possible arcs between the two given points. The following two flags select which one we draw:
+			.clockwise // = true | false (default is false). Two of the 4 solutions draw clockwise with respect to the center point, the other 2 counterclockwise
+			.large     // = true | false (default is false). Two of the 4 solutions are an arc longer than 180 degrees, the other two are <= 180 degrees
+		This implementation follows the SVG arc specs. For the details see 
+		http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+	*/
+	appendArc: function(endpoint, options) {
+		if(arguments.length < 2)
+		{
+			options = {};
+		}
+		if(this.closed) {
+			throw new Error("Path must not be closed");
+		}
+		if(this.points.length < 1) {
+			throw new Error("appendArc: path must already contain a point (the endpoint of the path is used as the starting point for the arc)");
+		}
+		var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution2D);
+		if(resolution < 4) resolution = 4;
+		var xradius, yradius;
+		if( ('xradius' in options) || ('yradius' in options) )
+		{
+			if('radius' in options)
+			{
+				throw new Error("Should either give an xradius and yradius parameter, or a radius parameter");
+			}
+			xradius = CSG.parseOptionAsFloat(options, "xradius", 0);
+			yradius = CSG.parseOptionAsFloat(options, "yradius", 0);
+		}
+		else
+		{
+			xradius = CSG.parseOptionAsFloat(options, "radius", 0);
+			yradius = xradius;
+		}
+		var xaxisrotation = CSG.parseOptionAsFloat(options, "xaxisrotation", 0);
+		var clockwise = CSG.parseOptionAsBool(options, "clockwise", false);
+		var largearc = CSG.parseOptionAsBool(options, "large", false);
+		var startpoint = this.points[this.points.length - 1];
+		endpoint = new CSG.Vector2D(endpoint);
+
+		var sweep_flag = !clockwise;
+		var newpoints = [];
+		if( (xradius == 0) || (yradius == 0) )
+		{
+			// http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes:
+			// If rx = 0 or ry = 0, then treat this as a straight line from (x1, y1) to (x2, y2) and stop
+			newpoints.push(endpoint);
+		}
+		else
+		{
+			xradius = Math.abs(xradius);
+			yradius = Math.abs(yradius);
+
+			// see http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes :
+			var phi = xaxisrotation * Math.PI / 180.0;
+			var cosphi = Math.cos(phi);
+			var sinphi = Math.sin(phi);
+			var minushalfdistance = startpoint.minus(endpoint).times(0.5);
+			// F.6.5.1:
+			var start_translated = new CSG.Vector2D(cosphi * minushalfdistance.x + sinphi * minushalfdistance.y, -sinphi * minushalfdistance.x + cosphi * minushalfdistance.y);
+			// F.6.6.2:
+			var biglambda = start_translated.x * start_translated.x / (xradius * xradius) + start_translated.y * start_translated.y / (yradius * yradius);
+			if(biglambda > 1)
+			{
+				// F.6.6.3:
+				var sqrtbiglambda = Math.sqrt(biglambda);
+				xradius *= sqrtbiglambda;
+				yradius *= sqrtbiglambda;
+			}
+			// F.6.5.2:
+			var multiplier1 = Math.sqrt( (xradius*xradius*yradius*yradius - xradius*xradius*start_translated.y*start_translated.y - yradius*yradius*start_translated.x*start_translated.x) / (xradius*xradius*start_translated.y*start_translated.y + yradius*yradius*start_translated.x*start_translated.x) );
+			if(sweep_flag == largearc) multiplier1 = -multiplier1;
+			var center_translated = new CSG.Vector2D(xradius*start_translated.y/yradius, -yradius*start_translated.x/xradius).times(multiplier1);
+			// F.6.5.3:
+			var center = new CSG.Vector2D(cosphi*center_translated.x - sinphi*center_translated.y, sinphi*center_translated.x + cosphi*center_translated.y).plus( (startpoint.plus(endpoint)).times(0.5) );
+			// F.6.5.5:
+			var vec1 = new CSG.Vector2D( (start_translated.x-center_translated.x)/xradius, (start_translated.y-center_translated.y)/yradius);
+			var vec2 = new CSG.Vector2D( (-start_translated.x-center_translated.x)/xradius, (-start_translated.y-center_translated.y)/yradius);
+			var theta1 = vec1.angleRadians();
+			var theta2 = vec2.angleRadians();
+			var deltatheta = theta2 - theta1;
+			deltatheta = deltatheta % (2*Math.PI);
+			if( (!sweep_flag) && (deltatheta > 0) )
+			{
+				deltatheta -= 2*Math.PI;
+			}
+			else if( (sweep_flag) && (deltatheta < 0) )
+			{
+				deltatheta += 2*Math.PI;
+			}
+
+			// Ok, we have the center point and angle range (from theta1, deltatheta radians) so we can create the ellipse
+			var numsteps=Math.ceil(Math.abs(deltatheta) / (2*Math.PI) * resolution) + 1;
+			if(numsteps < 1) numsteps = 1;
+			for(var step=1; step <= numsteps; step++)
+			{
+				var theta = theta1 + step/numsteps*deltatheta;
+				var costheta = Math.cos(theta);
+				var sintheta = Math.sin(theta);
+				// F.6.3.1:
+				var point = new CSG.Vector2D(cosphi*xradius*costheta - sinphi*yradius*sintheta, sinphi*xradius*costheta + cosphi*yradius*sintheta).plus(center);
+				newpoints.push(point);
+			}
+		}
+		newpoints = this.points.concat(newpoints);
+		var result = new CSG.Path2D(newpoints);
+		return result;
+	},
 };
 
 // Add several convenience methods to the classes that support a transform() method:
