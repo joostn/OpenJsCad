@@ -3775,7 +3775,11 @@ CSG.Vector2D.prototype = {
 
 	toString: function() {
 		return "("+this._x.toFixed(2)+", "+this._y.toFixed(2)+")";
-	}
+	},
+
+	abs: function() {
+		return new CSG.Vector2D(Math.abs(this._x), Math.abs(this._y));
+	},
 };
 
 
