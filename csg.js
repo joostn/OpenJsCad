@@ -1892,7 +1892,7 @@ CSG.roundedCube = function(options) {
 	{
 		if( ('center' in options) || ('radius' in options) )
 		{
-			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+			throw new Error("roundedCube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
 		}
 		corner1 = CSG.parseOptionAs3DVector(options, "corner1", [0, 0, 0]);
 		corner2 = CSG.parseOptionAs3DVector(options, "corner2", [1, 1, 1]);
@@ -5268,7 +5268,7 @@ CAG.rectangle = function(options) {
 	{
 		if( ('center' in options) || ('radius' in options) )
 		{
-			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+			throw new Error("rectangle: should either give a radius and center parameter, or a corner1 and corner2 parameter")
 		}
 		corner1 = CSG.parseOptionAs2DVector(options, "corner1", [0, 0]);
 		corner2 = CSG.parseOptionAs2DVector(options, "corner2", [1, 1]);
@@ -5300,7 +5300,7 @@ CAG.roundedRectangle = function(options) {
 	{
 		if( ('center' in options) || ('radius' in options) )
 		{
-			throw new Error("cube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+			throw new Error("roundedRectangle: should either give a radius and center parameter, or a corner1 and corner2 parameter")
 		}
 		corner1 = CSG.parseOptionAs2DVector(options, "corner1", [0, 0]);
 		corner2 = CSG.parseOptionAs2DVector(options, "corner2", [1, 1]);
