@@ -45,7 +45,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
   gl.viewport(0, 0, width, height);
   gl.matrixMode(gl.PROJECTION);
   gl.loadIdentity();
-  gl.perspective(45, width / height, 0.5, 1000);
+  gl.perspective(45, width / height, 0.5, 100000);
   gl.matrixMode(gl.MODELVIEW);
 
   // Set up WebGL state
@@ -115,6 +115,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
     {
       var factor = Math.pow(1.003, -wheelDelta);
       var coeff = _this.getZoom();
+      coeff = Math.max(coeff, 1e-3);
       coeff *= factor;
       _this.setZoom(coeff);
     }
@@ -138,7 +139,7 @@ OpenJsCad.Viewer.prototype = {
     return !!this.gl;
   },
 
-  ZOOM_MAX: 1000,
+  ZOOM_MAX: 10000,
   ZOOM_MIN: 10,
   onZoomChanged: null,
 
