@@ -95,8 +95,11 @@ CSG model is contructed using Javascript. For example:<br>
   return cube;
 }</pre>
 creates a cube with a radius of 1 and centered at the origin.
-The code should always contain a main() function. The main() function should either return a CSG object (for a 3D solid)
-or a CAG object (for a 2D area). 3D solids can be exported as STL files, 2D areas can be exported in a DXF file. 
+The code should always contain a main() function. The main() function should return a CSG object (for a 3D solid)
+or a CAG object (for a 2D area). It's also possible to return multiple objects (a dropdown box will be shown to select the
+part to be displayed), see <a href="#renderingmultipleobjects">rendering multiple objects</a>.
+<br><br>
+3D solids can be exported as STL files, 2D areas can be exported in a DXF file. 
 <br><br>
 To build your own models, create a .jscad file with your javascript code and parse the file using the 
 <a href="processfile.html">OpenJsCad parser</a>. When finished, click on Generate STL and save the result
@@ -758,6 +761,43 @@ function main(params) {
 }
 </pre>
 Or see the <a href="gearsdemo.html">Gears demo</a> for another example of interactive parameters.
+
+<h2><a name="renderingmultipleobjects">Rendering multiple objects</a></h2>
+In particular when laser cutting or CNC machining, an artwork often consists of multiple objects that will be machined separately.
+Usually the model is designed as a whole, and then the partial objects are created from the complete model.
+To facilitate this it's possible to return multiple objects from the main() function. This avoids
+the need to render the jscad file multiple times to get the STL or DXF file for each part. Returning multiple objects is done as follows:
+<pre>
+function main()
+{
+  var mycube = CSG.cube({radius: 10});
+  var mycircle = CAG.circle({radius: 10});
+
+  return [
+    {
+      name: "cube",              // optional, will be used as a prefix for the downloaded stl file
+      caption: "A small cube",   // will be shown in the dropdown box
+      data: mycube,
+    },
+    {
+      name: "circle",            // optional, will be used as a prefix for the downloaded dxf file
+      caption: "Circle",
+      data: mycircle,
+    },
+  ];
+}
+</pre>
+If more than 1 object is returned, a dropdown box is displayed for selecting the part to be displayed and/or downloaded.
+The jscad is not re-rendered so switching between parts happens fast.
+<br><br>
+Of course it's still possible to return just a single CSG or CAG:
+<pre>
+function main()
+{
+  return CSG.cube({radius: 10});
+}
+</pre>
+
 
 <h2>Orthonormal basis</h2>
 An orthonormal basis can be used to convert 3D points to 2D points by projecting them onto a 3D plane.
