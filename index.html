@@ -679,7 +679,7 @@ To do so, add a function getParameterDefinitions() to your .jscad source. This f
 an array with parameter definitions. Currently 6 parameters types are supported: float, int, text, longtext, bool and choice.
 The user edited values of the parameters will be supplied as an object parameter to the main() function of your .jscad file.
 <br><br>
-A float, int or text parameter is created by including the following object in the array returned by getParameterDefinitions(): 
+A float, int, bool or text parameter is created by including the following object in the array returned by getParameterDefinitions(): 
 <pre>{
   name: 'width',
   type: 'float',                      // or 'text', 'int', 'longtext', 'bool'
