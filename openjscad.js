@@ -1294,18 +1294,23 @@ OpenJsCad.Processor.prototype = {
       {
         throw new Error(errorprefix + "Unknown parameter type '"+type+"'");
       }
+      var initial;
+      if('initial' in paramdef)
+      {
+        initial = paramdef.initial;
+      }
+      else if('default' in paramdef)
+      {
+        initial = paramdef['default'];
+      }
       var control;
       if( (type == "text") || (type == "int") || (type == "float") )
       {
         control = document.createElement("input");
         control.type = "text";
-        if('initial' in paramdef)
+        if(initial !== undefined)
         {
-          control.value = paramdef.initial;
-        }
-        else if('default' in paramdef)
-        {
-          control.value = paramdef['default'];
+          control.value = initial;
         }
         else
         {
@@ -1347,9 +1352,9 @@ OpenJsCad.Processor.prototype = {
           option.value = values[valueindex];
           option.text = captions[valueindex];
           control.add(option);
-          if('default' in paramdef)
+          if(initial !== undefined)
           {
-            if(paramdef.default == values[valueindex])
+            if(initial == values[valueindex])
             {
               selectedindex = valueindex;
             }
@@ -1363,9 +1368,9 @@ OpenJsCad.Processor.prototype = {
       else if(type == "longtext")
       {
         control = document.createElement("textarea");
-        if('default' in paramdef)
+        if(initial !== undefined)
         {
-          control.value = paramdef.default;
+          control.value = initial;
         }
         else
         {
@@ -1376,13 +1381,13 @@ OpenJsCad.Processor.prototype = {
       {
         control = document.createElement("input");
         control.type = "checkbox";
-        if('default' in paramdef)
+        if(initial !== undefined)
         {
-          if(typeof(paramdef.default) != "boolean")
+          if(typeof(initial) != "boolean")
           {
-            throw new Error(errorprefix + "'default' of type 'bool' has to be boolean (true/false)");
+            throw new Error(errorprefix + "initial/default of type 'bool' has to be boolean (true/false)");
           }
-          control.checked = paramdef.default;
+          control.checked = initial;
         }
         else
         {
