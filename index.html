@@ -60,7 +60,7 @@ function updateSolid()
 </head>
 <body onload="onload()">
   <h1>OpenJsCad</h1>
-Create an STL file for 3D printing using constructive solid modeling in Javascript. 
+Web based solid modeling in Javascript: user editable parametric models, STL and DXF export.
 <div id="viewer"></div>
   <h2>Playground</h2>
 Try it by entering some code below. Anything you enter will be lost as soon as this page is reloaded;    
@@ -78,7 +78,7 @@ function main(params)
     params.clearance,
     params.thickness
   );
-  if(params.centerholeradius > 0)
+  if(params.centerholeradius &gt; 0)
   {
     var centerhole = CSG.cylinder({start: [0,0,-params.thickness], end: [0,0,params.thickness], radius: params.centerholeradius, resolution: 16});
     gear = gear.subtract(centerhole);
@@ -109,9 +109,9 @@ function getParameterDefinitions() {
 function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickness)
 {
   // default values:
-  if(arguments.length < 3) pressureAngle = 20;
-  if(arguments.length < 4) clearance = 0;
-  if(arguments.length < 4) thickness = 1;
+  if(arguments.length &lt; 3) pressureAngle = 20;
+  if(arguments.length &lt; 4) clearance = 0;
+  if(arguments.length &lt; 4) thickness = 1;
   
   var addendum = circularPitch / Math.PI;
   var dedendum = addendum + clearance;
@@ -133,7 +133,7 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
   // build a single 2d tooth in the 'points' array:
   var resolution = 5;
   var points = [new CSG.Vector2D(0,0)];
-  for(var i = 0; i <= resolution; i++)
+  for(var i = 0; i &lt;= resolution; i++)
   {
     // first side of the tooth:
     var angle = maxangle * i / resolution;
@@ -154,7 +154,7 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
   var tooth3d = new CSG.Polygon2D(points).extrude({offset: [0, 0, thickness]});
 
   var allteeth = new CSG();
-  for(var i = 0; i < numTeeth; i++)
+  for(var i = 0; i &lt; numTeeth; i++)
   {
     var angle = i*360/numTeeth;
     var rotatedtooth = tooth3d.rotateZ(angle);
@@ -165,7 +165,7 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
   points = [];
   var toothAngle = 2 * Math.PI / numTeeth;
   var toothCenterAngle = 0.5 * angularToothWidthAtBase; 
-  for(var i = 0; i < numTeeth; i++)
+  for(var i = 0; i &lt; numTeeth; i++)
   {
     var angle = toothCenterAngle + i * toothAngle;
     var p = CSG.Vector2D.fromAngle(angle).times(rootRadius);
