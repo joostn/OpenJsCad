@@ -719,7 +719,7 @@ OpenJsCad.Processor.prototype = {
       this.viewer = new OpenJsCad.Viewer(this.viewerdiv, this.viewerwidth, this.viewerheight, this.initialViewerDistance);
     } catch(e) {
       //      this.viewer = null;
-      this.viewerdiv.innerHTML = "<b><br><br>Error: " + e.toString() + "</b><br><br>OpenJsCad currently requires Google Chrome with WebGL enabled";
+      this.viewerdiv.innerHTML = "<b><br><br>Error: " + e.toString() + "</b><br><br>OpenJsCad requires a WebGL enabled browser. Try a recent version of Chrome of Firefox.";
       //      this.viewerdiv.innerHTML = e.toString();
     }
     //Zoom control
@@ -740,18 +740,21 @@ OpenJsCad.Processor.prototype = {
       that.viewer.setZoom(newzoom);
       that.zoomChangedBySlider=false;
     };
-    this.viewer.onZoomChanged = function() {
-      if(!that.zoomChangedBySlider)
-      {
-        var newzoom = that.viewer.getZoom();
-        that.zoomControl.scrollLeft = newzoom * (10 * that.zoomControl.offsetWidth);
-      }
-    };
+    if(this.viewer)
+    {
+      this.viewer.onZoomChanged = function() {
+        if(!that.zoomChangedBySlider)
+        {
+          var newzoom = that.viewer.getZoom();
+          that.zoomControl.scrollLeft = newzoom * (10 * that.zoomControl.offsetWidth);
+        }
+      };
+      this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * 
+        (this.zoomControl.scrollWidth - this.zoomControl.offsetWidth);
+    }
 
     this.containerdiv.appendChild(this.zoomControl);
     //this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * this.zoomControl.offsetWidth;
-    this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * 
-      (this.zoomControl.scrollWidth - this.zoomControl.offsetWidth);
 
     //end of zoom control
 
