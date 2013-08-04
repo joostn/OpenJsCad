@@ -186,9 +186,8 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
 <input type="submit" value="Update" onclick="updateSolid(); return false;">
 <br>
 <h2>About</h2>
-This is intended to become a Javascript based alternative to <a href="http://www.openscad.org/">OpenSCAD</a>,
-for 3D solid modeling.
-CSG model is contructed using Javascript. For example:<br>
+OpenJsCad is a 2D and 3D modeling tool similar to <a href="http://www.openscad.org/">OpenSCAD</a>,
+but web based and using Javascript language. For example:<br>
 <pre>function main() {
   var cube = CSG.cube(); 
   return cube;
@@ -208,7 +207,7 @@ Some of the benefits:
 <ul>
 <li>Runs in your browser, no need to install any software.</li>
 <li>You can create parametric models with user editable parameters: parameters can be changed in the browser window,
-without the need to edit the source script. See the <a href="gearsdemo.html">Gears demo</a> for example!</li>
+without the need to edit the source script. See the Gears demo at the top of this page for example.</li>
 <li>JavaScript is an extremely flexible language, supporting dynamic arrays, object oriented programming, closures, anonymous functions and more</li>
 <li>Solids are stored in variables. This allows for example conditional cloning of objects, something which is nearly impossible in OpenSCAD.</li>
 <li>Properties and Connectors (see below) make it very easy to attach objects to each other at predetermined
