@@ -2111,6 +2111,16 @@ CSG.Vector3D = function(x, y, z) {
 	}
 };
 
+// This does the same as new CSG.Vector3D(x,y,z) but it doesn't go through the constructor
+// and the parameters are not validated. Is much faster.
+CSG.Vector3D.Create = function(x,y,z) {
+	var result = Object.create(CSG.Vector3D.prototype);
+	result._x = x;
+	result._y = y;
+	result._z = z;
+	return result;
+};
+
 CSG.Vector3D.prototype = {
 	get x() {
 		return this._x;
@@ -2129,31 +2139,31 @@ CSG.Vector3D.prototype = {
 	},
 
 	clone: function() {
-		return new CSG.Vector3D(this);
+		return CSG.Vector3D.Create(this._x, this._y, this._z);
 	},
 
 	negated: function() {
-		return new CSG.Vector3D(-this._x, -this._y, -this._z);
+		return CSG.Vector3D.Create(-this._x, -this._y, -this._z);
 	},
 
 	abs: function() {
-		return new CSG.Vector3D(Math.abs(this._x), Math.abs(this._y), Math.abs(this._z));
+		return CSG.Vector3D.Create(Math.abs(this._x), Math.abs(this._y), Math.abs(this._z));
 	},
 
 	plus: function(a) {
-		return new CSG.Vector3D(this._x + a._x, this._y + a._y, this._z + a._z);
+		return CSG.Vector3D.Create(this._x + a._x, this._y + a._y, this._z + a._z);
 	},
 
 	minus: function(a) {
-		return new CSG.Vector3D(this._x - a._x, this._y - a._y, this._z - a._z);
+		return CSG.Vector3D.Create(this._x - a._x, this._y - a._y, this._z - a._z);
 	},
 
 	times: function(a) {
-		return new CSG.Vector3D(this._x * a, this._y * a, this._z * a);
+		return CSG.Vector3D.Create(this._x * a, this._y * a, this._z * a);
 	},
 
 	dividedBy: function(a) {
-		return new CSG.Vector3D(this._x / a, this._y / a, this._z / a);
+		return CSG.Vector3D.Create(this._x / a, this._y / a, this._z / a);
 	},
 
 	dot: function(a) {
@@ -2177,7 +2187,7 @@ CSG.Vector3D.prototype = {
 	},
 
 	cross: function(a) {
-		return new CSG.Vector3D(
+		return CSG.Vector3D.Create(
 		this._y * a._z - this._z * a._y, this._z * a._x - this._x * a._z, this._x * a._y - this._y * a._x);
 	},
 
@@ -2215,21 +2225,21 @@ CSG.Vector3D.prototype = {
 	randomNonParallelVector: function() {
 		var abs = this.abs();
 		if((abs._x <= abs._y) && (abs._x <= abs._z)) {
-			return new CSG.Vector3D(1, 0, 0);
+			return CSG.Vector3D.Create(1, 0, 0);
 		} else if((abs._y <= abs._x) && (abs._y <= abs._z)) {
-			return new CSG.Vector3D(0, 1, 0);
+			return CSG.Vector3D.Create(0, 1, 0);
 		} else {
-			return new CSG.Vector3D(0, 0, 1);
+			return CSG.Vector3D.Create(0, 0, 1);
 		}
 	},
 
 	min: function(p) {
-		return new CSG.Vector3D(
+		return CSG.Vector3D.Create(
 		Math.min(this._x, p._x), Math.min(this._y, p._y), Math.min(this._z, p._z));
 	},
 
 	max: function(p) {
-		return new CSG.Vector3D(
+		return CSG.Vector3D.Create(
 		Math.max(this._x, p._x), Math.max(this._y, p._y), Math.max(this._z, p._z));
 	}
 };
