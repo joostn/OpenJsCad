@@ -142,7 +142,7 @@ CSG.fromCompactBinary = function(bin) {
 		y = planeData[arrayindex++];
 		z = planeData[arrayindex++];
 		w = planeData[arrayindex++];
-		normal = new CSG.Vector3D(x, y, z);
+		normal = CSG.Vector3D.Create(x, y, z);
 		plane = new CSG.Plane(normal, w);
 		planes.push(plane);
 	}
@@ -156,7 +156,7 @@ CSG.fromCompactBinary = function(bin) {
 		x = vertexData[arrayindex++];
 		y = vertexData[arrayindex++];
 		z = vertexData[arrayindex++];
-		pos = new CSG.Vector3D(x, y, z);
+		pos = CSG.Vector3D.Create(x, y, z);
 		vertex = new CSG.Vertex(pos);
 		vertices.push(vertex);
 	}
@@ -3697,7 +3697,16 @@ CSG.Vector2D.fromAngleDegrees = function(degrees) {
 };
 
 CSG.Vector2D.fromAngleRadians = function(radians) {
-	return new CSG.Vector2D(Math.cos(radians), Math.sin(radians));
+	return CSG.Vector2D.Create(Math.cos(radians), Math.sin(radians));
+};
+
+// This does the same as new CSG.Vector2D(x,y) but it doesn't go through the constructor
+// and the parameters are not validated. Is much faster.
+CSG.Vector2D.Create = function(x,y) {
+	var result = Object.create(CSG.Vector2D.prototype);
+	result._x = x;
+	result._y = y;
+	return result;
 };
 
 CSG.Vector2D.prototype = {
@@ -3723,27 +3732,27 @@ CSG.Vector2D.prototype = {
 	},
 
 	clone: function() {
-		return new CSG.Vector2D(this._x, this._y);
+		return CSG.Vector2D.Create(this._x, this._y);
 	},
 
 	negated: function() {
-		return new CSG.Vector2D(-this._x, -this._y);
+		return CSG.Vector2D.Create(-this._x, -this._y);
 	},
 
 	plus: function(a) {
-		return new CSG.Vector2D(this._x + a._x, this._y + a._y);
+		return CSG.Vector2D.Create(this._x + a._x, this._y + a._y);
 	},
 
 	minus: function(a) {
-		return new CSG.Vector2D(this._x - a._x, this._y - a._y);
+		return CSG.Vector2D.Create(this._x - a._x, this._y - a._y);
 	},
 
 	times: function(a) {
-		return new CSG.Vector2D(this._x * a, this._y * a);
+		return CSG.Vector2D.Create(this._x * a, this._y * a);
 	},
 
 	dividedBy: function(a) {
-		return new CSG.Vector2D(this._x / a, this._y / a);
+		return CSG.Vector2D.Create(this._x / a, this._y / a);
 	},
 
 	dot: function(a) {
@@ -3780,7 +3789,7 @@ CSG.Vector2D.prototype = {
 
 	// returns the vector rotated by 90 degrees clockwise
 	normal: function() {
-		return new CSG.Vector2D(this._y, -this._x);
+		return CSG.Vector2D.Create(this._y, -this._x);
 	},
 
 	// Right multiply by a 4x4 matrix (the vector is interpreted as a row vector)
@@ -3808,12 +3817,12 @@ CSG.Vector2D.prototype = {
 	},
 
 	min: function(p) {
-		return new CSG.Vector2D(
+		return CSG.Vector2D.Create(
 		Math.min(this._x, p._x), Math.min(this._y, p._y));
 	},
 
 	max: function(p) {
-		return new CSG.Vector2D(
+		return CSG.Vector2D.Create(
 		Math.max(this._x, p._x), Math.max(this._y, p._y));
 	},
 
@@ -3822,7 +3831,7 @@ CSG.Vector2D.prototype = {
 	},
 
 	abs: function() {
-		return new CSG.Vector2D(Math.abs(this._x), Math.abs(this._y));
+		return CSG.Vector2D.Create(Math.abs(this._x), Math.abs(this._y));
 	},
 };
 
@@ -5228,17 +5237,17 @@ CSG.addTransformationMethodsToPrototype = function(prot) {
 	};
 
 	prot.mirroredX = function() {
-		var plane = new CSG.Plane(new CSG.Vector3D(1, 0, 0), 0);
+		var plane = new CSG.Plane(CSG.Vector3D.Create(1, 0, 0), 0);
 		return this.mirrored(plane);
 	};
 
 	prot.mirroredY = function() {
-		var plane = new CSG.Plane(new CSG.Vector3D(0, 1, 0), 0);
+		var plane = new CSG.Plane(CSG.Vector3D.Create(0, 1, 0), 0);
 		return this.mirrored(plane);
 	};
 
 	prot.mirroredZ = function() {
-		var plane = new CSG.Plane(new CSG.Vector3D(0, 0, 1), 0);
+		var plane = new CSG.Plane(CSG.Vector3D.Create(0, 0, 1), 0);
 		return this.mirrored(plane);
 	};
 
