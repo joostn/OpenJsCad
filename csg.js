@@ -829,16 +829,28 @@ CSG.prototype = {
 		if(this.isRetesselated) {
 			return this;
 		} else {
-			var csg = this.canonicalized();
+			var csg = this;
 			var polygonsPerPlane = {};
+			var isCanonicalized = csg.isCanonicalized;
+			var fuzzyfactory = new CSG.fuzzyCSGFactory();
 			csg.polygons.map(function(polygon) {
-				var planetag = polygon.plane.getTag();
-				var sharedtag = polygon.shared.getTag();
-				planetag += "/" + sharedtag;
-				if(!(planetag in polygonsPerPlane)) {
-					polygonsPerPlane[planetag] = [];
+				var plane = polygon.plane;
+				var shared = polygon.shared;
+				if(!isCanonicalized)
+				{
+					// in order to identify to polygons having the same plane, we need to canonicalize the planes
+					// We don't have to do a full canonizalization (including vertices), to save time only do the planes and the shared data:
+					plane = fuzzyfactory.getPlane(plane);
+					shared = fuzzyfactory.getPolygonShared(shared);
 				}
-				polygonsPerPlane[planetag].push(polygon);
+				var tag = plane.getTag() + "/" + shared.getTag();
+				if(!(tag in polygonsPerPlane)) {
+					polygonsPerPlane[tag] = [polygon];
+				}
+				else
+				{
+					polygonsPerPlane[tag].push(polygon);
+				}
 			});
 			var destpolygons = [];
 			for(var planetag in polygonsPerPlane) {
@@ -853,8 +865,7 @@ CSG.prototype = {
 			}
 			var result = CSG.fromPolygons(destpolygons);
 			result.isRetesselated = true;
-			result = result.canonicalized();
-			//      result.isCanonicalized = true;
+			// result = result.canonicalized();
 			result.properties = this.properties; // keep original properties
 			return result;
 		}
@@ -4178,7 +4189,7 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons) {
 						newy = pos2d.y;
 						ycoordinatebins[ycoordinatebin] = pos2d.y;
 					}
-					pos2d = new CSG.Vector2D(pos2d.x, newy);
+					pos2d = CSG.Vector2D.Create(pos2d.x, newy);
 					vertices2d.push(pos2d);
 					var y = pos2d.y;
 					if((i === 0) || (y < miny)) {
@@ -4347,13 +4358,13 @@ CSG.reTesselateCoplanarPolygons = function(sourcepolygons, destpolygons) {
 					var numvertices = vertices2d.length;
 
 					var x = CSG.interpolateBetween2DPointsForY(activepolygon.topleft, activepolygon.bottomleft, ycoordinate);
-					var topleft = new CSG.Vector2D(x, ycoordinate);
+					var topleft = CSG.Vector2D.Create(x, ycoordinate);
 					x = CSG.interpolateBetween2DPointsForY(activepolygon.topright, activepolygon.bottomright, ycoordinate);
-					var topright = new CSG.Vector2D(x, ycoordinate);
+					var topright = CSG.Vector2D.Create(x, ycoordinate);
 					x = CSG.interpolateBetween2DPointsForY(activepolygon.topleft, activepolygon.bottomleft, nextycoordinate);
-					var bottomleft = new CSG.Vector2D(x, nextycoordinate);
+					var bottomleft = CSG.Vector2D.Create(x, nextycoordinate);
 					x = CSG.interpolateBetween2DPointsForY(activepolygon.topright, activepolygon.bottomright, nextycoordinate);
-					var bottomright = new CSG.Vector2D(x, nextycoordinate);
+					var bottomright = CSG.Vector2D.Create(x, nextycoordinate);
 					var outpolygon = {
 						topleft: topleft,
 						topright: topright,
