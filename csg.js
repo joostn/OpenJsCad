@@ -4044,6 +4044,158 @@ CSG.OrthoNormalBasis = function(plane, rightvector) {
 	this.planeorigin = plane.normal.times(plane.w);
 };
 
+// Get an orthonormal basis for the standard XYZ planes.
+// Parameters: the names of two 3D axes. The 2d x axis will map to the first given 3D axis, the 2d y 
+// axis will map to the second.
+// Prepend the axis with a "-" to invert the direction of this axis.
+// For example: CSG.OrthoNormalBasis.GetCartesian("-Y","Z")
+//   will return an orthonormal basis where the 2d X axis maps to the 3D inverted Y axis, and
+//   the 2d Y axis maps to the 3D Z axis.
+CSG.OrthoNormalBasis.GetCartesian = function(xaxisid, yaxisid) {
+	var axisid=xaxisid+"/"+yaxisid;
+	var planenormal, rightvector;
+	if(axisid == "X/Y")
+	{
+		planenormal=[0,0,1]; rightvector=[1,0,0];
+	}
+	else if(axisid == "Y/-X")
+	{
+		planenormal=[0,0,1]; rightvector=[0,1,0];		
+	}
+	else if(axisid == "-X/-Y")
+	{
+		planenormal=[0,0,1]; rightvector=[-1,0,0];		
+	}
+	else if(axisid == "-Y/X")
+	{
+		planenormal=[0,0,1]; rightvector=[0,-1,0];		
+	}
+	else if(axisid == "-X/Y")
+	{
+		planenormal=[0,0,-1]; rightvector=[-1,0,0];
+	}
+	else if(axisid == "-Y/-X")
+	{
+		planenormal=[0,0,-1]; rightvector=[0,-1,0];		
+	}
+	else if(axisid == "X/-Y")
+	{
+		planenormal=[0,0,-1]; rightvector=[1,0,0];		
+	}
+	else if(axisid == "Y/X")
+	{
+		planenormal=[0,0,-1]; rightvector=[0,1,0];		
+	}
+	else if(axisid == "X/Z")
+	{
+		planenormal=[0,-1,0]; rightvector=[1,0,0];
+	}
+	else if(axisid == "Z/-X")
+	{
+		planenormal=[0,-1,0]; rightvector=[0,0,1];		
+	}
+	else if(axisid == "-X/-Z")
+	{
+		planenormal=[0,-1,0]; rightvector=[-1,0,0];		
+	}
+	else if(axisid == "-Z/X")
+	{
+		planenormal=[0,-1,0]; rightvector=[0,0,-1];		
+	}
+	else if(axisid == "-X/Z")
+	{
+		planenormal=[0,1,0]; rightvector=[-1,0,0];
+	}
+	else if(axisid == "-Z/-X")
+	{
+		planenormal=[0,1,0]; rightvector=[0,0,-1];		
+	}
+	else if(axisid == "X/-Z")
+	{
+		planenormal=[0,1,0]; rightvector=[1,0,0];		
+	}
+	else if(axisid == "Z/X")
+	{
+		planenormal=[0,1,0]; rightvector=[0,0,1];		
+	}
+	else if(axisid == "Y/Z")
+	{
+		planenormal=[1,0,0]; rightvector=[0,1,0];
+	}
+	else if(axisid == "Z/-Y")
+	{
+		planenormal=[1,0,0]; rightvector=[0,0,1];		
+	}
+	else if(axisid == "-Y/-Z")
+	{
+		planenormal=[1,0,0]; rightvector=[0,-1,0];		
+	}
+	else if(axisid == "-Z/Y")
+	{
+		planenormal=[1,0,0]; rightvector=[0,0,-1];		
+	}
+	else if(axisid == "-Y/Z")
+	{
+		planenormal=[-1,0,0]; rightvector=[0,-1,0];
+	}
+	else if(axisid == "-Z/-Y")
+	{
+		planenormal=[-1,0,0]; rightvector=[0,0,-1];		
+	}
+	else if(axisid == "Y/-Z")
+	{
+		planenormal=[-1,0,0]; rightvector=[0,1,0];		
+	}
+	else if(axisid == "Z/Y")
+	{
+		planenormal=[-1,0,0]; rightvector=[0,0,1];		
+	}
+	else
+	{
+		throw new Error("CSG.OrthoNormalBasis.GetCartesian: invalid combination of axis identifiers. Should pass two string arguments from [X,Y,Z,-X,-Y,-Z], being two different axes.");
+	}
+	return new CSG.OrthoNormalBasis(new CSG.Plane(new CSG.Vector3D(planenormal), 0), new CSG.Vector3D(rightvector));
+};
+
+/*
+// test code for CSG.OrthoNormalBasis.GetCartesian()
+CSG.OrthoNormalBasis.GetCartesian_Test=function() {
+	var axisnames=["X","Y","Z","-X","-Y","-Z"];
+	var axisvectors=[[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]];
+	for(var axis1=0; axis1 < 3; axis1++)
+	{
+		for(var axis1inverted=0; axis1inverted < 2; axis1inverted++)
+		{
+			var axis1name=axisnames[axis1+3*axis1inverted];
+			var axis1vector=axisvectors[axis1+3*axis1inverted];
+			for(var axis2=0; axis2 < 3; axis2++)
+			{
+				if(axis2 != axis1)
+				{
+					for(var axis2inverted=0; axis2inverted < 2; axis2inverted++)
+					{
+						var axis2name=axisnames[axis2+3*axis2inverted];
+						var axis2vector=axisvectors[axis2+3*axis2inverted];
+						var orthobasis=CSG.OrthoNormalBasis.GetCartesian(axis1name, axis2name);
+						var test1=orthobasis.to3D(new CSG.Vector2D([1,0]));
+						var test2=orthobasis.to3D(new CSG.Vector2D([0,1]));
+						var expected1=new CSG.Vector3D(axis1vector);
+						var expected2=new CSG.Vector3D(axis2vector);
+						var d1=test1.distanceTo(expected1);
+						var d2=test2.distanceTo(expected2);
+						if( (d1 > 0.01) || (d2 > 0.01) )
+						{
+							throw new Error("Wrong!");
+						}
+					}
+				}
+			}
+		}
+	}
+	throw new Error("OK");
+};
+*/
+
 // The z=0 plane, with the 3D x and y vectors mapped to the 2D x and y vector
 CSG.OrthoNormalBasis.Z0Plane = function() {
 	var plane = new CSG.Plane(new CSG.Vector3D([0, 0, 1]), 0);
@@ -5697,6 +5849,32 @@ CAG.prototype = {
 	contract: function(radius, resolution) {
 		var result = this.subtract(this.expandedShell(radius, resolution));
 		return result;
+	},
+
+	// extrude the CAG in a certain plane. 
+	// Giving just a plane is not enough, multiple different extrusions in the same plane would be possible
+	// by rotating around the plane's origin. An additional right-hand vector should be specified as well,
+	// and this is exactly a CSG.OrthoNormalBasis.
+	// orthonormalbasis: characterizes the plane in which to extrude
+	// depth: thickness of the extruded shape. Extrusion is done symmetrically above and below the plane.
+	extrudeInOrthonormalBasis: function(orthonormalbasis, depth) {
+		// first extrude in the regular Z plane:
+		if(!(orthonormalbasis instanceof CSG.OrthoNormalBasis))
+		{
+			throw new Error("extrudeInPlane: the first parameter should be a CSG.OrthoNormalBasis");
+		}
+		var extruded=this.extrude({offset: [0,0,depth]}).translate([0,0,-depth/2]);
+		var matrix=orthonormalbasis.getInverseProjectionMatrix();
+		extruded=extruded.transform(matrix);
+		return extruded;
+	},
+
+	// Extrude in a standard cartesian plane, specified by two axis identifiers. Each identifier can be
+	// one of ["X","Y","Z","-X","-Y","-Z"]
+	// The 2d x axis will map to the first given 3D axis, the 2d y axis will map to the second.
+	// See CSG.OrthoNormalBasis.GetCartesian for details.
+	extrudeInPlane: function(axis1, axis2, depth) {
+		return this.extrudeInOrthonormalBasis(CSG.OrthoNormalBasis.GetCartesian(axis1, axis2), depth);
 	},
 
   // extruded=cag.extrude({offset: [0,0,10], twistangle: 360, twiststeps: 100});
