@@ -1175,6 +1175,10 @@ OpenJsCad.Processor.prototype = {
     {
       blob=this.currentObject.toDxf();
     }
+    else if(format == "raw")
+    {
+      blob=this.currentObject.toRaw();
+    }
     else
     {
       throw new Error("Not supported");
@@ -1186,7 +1190,7 @@ OpenJsCad.Processor.prototype = {
     if (this.currentObject instanceof CSG) {
       return ["stl", "x3d"];
     } else if (this.currentObject instanceof CAG) {
-      return ["dxf"];
+      return ["dxf", "raw"];
     } else {
       throw new Error("Not supported");
     }
@@ -1208,6 +1212,11 @@ OpenJsCad.Processor.prototype = {
         displayName: "DXF",
         extension: "dxf",
         mimetype: "application/dxf",
+        },
+      raw: {
+        displayName: "RAW",
+        extension: "raw",
+        mimetype: "application/dat",
         }
     }[format];
   },
