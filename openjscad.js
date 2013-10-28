@@ -1177,7 +1177,7 @@ OpenJsCad.Processor.prototype = {
     }
     else if(format == "gridpro")
     {
-      blob=this.currentObject.toRaw();
+      blob=this.currentObject.toGridPro();
     }
     else
     {
