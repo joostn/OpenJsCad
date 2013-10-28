@@ -1175,7 +1175,7 @@ OpenJsCad.Processor.prototype = {
     {
       blob=this.currentObject.toDxf();
     }
-    else if(format == "raw")
+    else if(format == "gridpro")
     {
       blob=this.currentObject.toRaw();
     }
@@ -1190,7 +1190,7 @@ OpenJsCad.Processor.prototype = {
     if (this.currentObject instanceof CSG) {
       return ["stl", "x3d"];
     } else if (this.currentObject instanceof CAG) {
-      return ["dxf", "raw"];
+      return ["dxf", "gridpro"];
     } else {
       throw new Error("Not supported");
     }
@@ -1213,9 +1213,9 @@ OpenJsCad.Processor.prototype = {
         extension: "dxf",
         mimetype: "application/dxf",
         },
-      raw: {
-        displayName: "RAW",
-        extension: "raw",
+      gridpro: {
+        displayName: "GridPro",
+        extension: "dat",
         mimetype: "application/dat",
         }
     }[format];
