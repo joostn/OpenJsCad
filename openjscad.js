@@ -1179,6 +1179,10 @@ OpenJsCad.Processor.prototype = {
     {
       blob=this.currentObject.toGridProSurface();
     }
+    else if(format == "gridproQuadSections")
+    {
+      blob=this.currentObject.toGridProQuadSections();
+    }
     else if(format == "gridproTopology")
     {
       blob=this.currentObject.toGridProTopology();
@@ -1194,7 +1198,7 @@ OpenJsCad.Processor.prototype = {
     if (this.currentObject instanceof CSG) {
       return ["stl", "x3d"];
     } else if (this.currentObject instanceof CAG) {
-      return ["dxf", "gridproSurface", "gridproTopology"];
+      return ["dxf", "gridproSurface", "gridproTopology", "gridproQuadSections"];
     } else {
       throw new Error("Not supported");
     }
@@ -1221,6 +1225,11 @@ OpenJsCad.Processor.prototype = {
         displayName: "GridProSurface",
         extension: "dat",
         mimetype: "application/dat",
+        },
+      gridproQuadSections: {
+        displayName: "GridProQuadSections",
+        extension: "quad",
+        mimetype: "application/quad",
         },
       gridproTopology: {
         displayName: "GridProTopology",
