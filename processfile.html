@@ -73,13 +73,9 @@ function handleFileSelect(evt)
   if(!evt.dataTransfer.files) throw new Error("Not a datatransfer (2)");
   if(evt.dataTransfer.files.length != 1)
   {
-    throw new Error("Please drop a single .jscad file");
+    throw new Error("Please drop a single file");
   }
   var file = evt.dataTransfer.files[0];
-  if(!file.name.match(/\.jscad$/i))
-  {
-    throw new Error("Please drop a file with .jscad extension");
-  }
   if(file.size == 0)
   {
     throw new Error("You have dropped an empty file");
