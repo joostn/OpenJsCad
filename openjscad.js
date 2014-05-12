@@ -22,7 +22,10 @@ OpenJsCad.log = function(txt) {
 
 // A viewer is a WebGL canvas that lets the user view a mesh. The user can
 // tumble it around by dragging the mouse.
-OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
+OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displayW, displayH, options) {
+  options = options || {};
+  this.color = options.color || [0,0,1];
+  this.bgColor = options.bgColor || [0.93, 0.93, 0.93, 1];
   var gl = GL.create();
   this.gl = gl;
   this.angleX = -60;
@@ -35,10 +38,12 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
   // Draw axes flag:
   this.drawAxes = true;
   // Draw triangle lines:
-  this.drawLines = false;
+  this.drawLines = options.showLines || false;
   // Set to true so lines don't use the depth buffer
-  this.lineOverlay = false;
+  this.lineOverlay = options.showLines || false;
 
+  gl.canvas.style.width = displayW;
+  gl.canvas.style.height = displayH;
   // Set up the viewport
   gl.canvas.width = width;
   gl.canvas.height = height;
@@ -50,7 +55,8 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
 
   // Set up WebGL state
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-  gl.clearColor(0.93, 0.93, 0.93, 1);
+  // gl.clearColor(0.93, 0.93, 0.93, 1);
+  gl.clearColor.apply(gl, this.bgColor);
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
   gl.polygonOffset(1, 1);
@@ -90,7 +96,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
     }\
   ');
 
-  containerelement.appendChild(gl.canvas);  
+  containerelement.appendChild(gl.canvas);
 
   var _this=this;
 
@@ -101,7 +107,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
     _this.onDraw();
   };
   gl.onmousewheel = function(e) {
-    var wheelDelta = 0;    
+    var wheelDelta = 0;
     if (e.wheelDelta)
     {
       wheelDelta = e.wheelDelta;
@@ -109,7 +115,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
     else if (e.detail)
     {
       // for firefox, see http://stackoverflow.com/questions/8886281/event-wheeldelta-returns-undefined
-      wheelDelta = e.detail * -40;     
+      wheelDelta = e.detail * -40;
     }
     if(wheelDelta)
     {
@@ -125,14 +131,14 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth) {
 
 OpenJsCad.Viewer.prototype = {
   setCsg: function(csg) {
-    this.meshes = OpenJsCad.Viewer.csgToMeshes(csg);
-    this.onDraw();    
+    this.meshes = OpenJsCad.Viewer.csgToMeshes(csg, this.color);
+    this.onDraw();
   },
 
   clear: function() {
     // empty mesh list:
-    this.meshes = []; 
-    this.onDraw();    
+    this.meshes = [];
+    this.onDraw();
   },
 
   supported: function() {
@@ -162,19 +168,21 @@ OpenJsCad.Viewer.prototype = {
   onMouseMove: function(e) {
     if (e.dragging) {
       e.preventDefault();
-      if(e.altKey) { //ROTATE Z, X
-        this.angleZ += e.deltaX * 2;
+      if(e.altKey) {
+        //ROTATE X, Y
+        this.angleY += e.deltaX * 2;
         this.angleX += e.deltaY * 2;
+        //this.angleX = Math.max(-180, Math.min(180, this.angleX));
       } else if(e.shiftKey) {//PAN
         var factor = 5e-3;
         this.viewpointX += factor * e.deltaX * this.viewpointZ;
         this.viewpointY -= factor * e.deltaY * this.viewpointZ;
-      } else {//ROTATE X, Y
-        this.angleY += e.deltaX * 2;
+      } else {
+        //ROTATE Z, X
+        this.angleZ += e.deltaX * 2;
         this.angleX += e.deltaY * 2;
-        //this.angleX = Math.max(-180, Math.min(180, this.angleX));
       }
-      this.onDraw();    
+      this.onDraw();
     }
   },
 
@@ -190,7 +198,7 @@ OpenJsCad.Viewer.prototype = {
     gl.rotate(this.angleZ, 0, 0, 1);
 
     if (!this.lineOverlay) gl.enable(gl.POLYGON_OFFSET_FILL);
-    for (var i = 0; i < this.meshes.length; i++) {  
+    for (var i = 0; i < this.meshes.length; i++) {
       var mesh = this.meshes[i];
       this.lightingShader.draw(mesh, gl.TRIANGLES);
     }
@@ -200,7 +208,7 @@ OpenJsCad.Viewer.prototype = {
     {
       if (this.lineOverlay) gl.disable(gl.DEPTH_TEST);
       gl.enable(gl.BLEND);
-      for (var i = 0; i < this.meshes.length; i++) {  
+      for (var i = 0; i < this.meshes.length; i++) {
         var mesh = this.meshes[i];
         this.blackShader.draw(mesh, gl.LINES);
       }
@@ -241,12 +249,12 @@ OpenJsCad.Viewer.prototype = {
       gl.disable(gl.BLEND);
     }
   }
-}
+};
 
 // Convert from CSG solid to an array of GL.Mesh objects
 // limiting the number of vertices per mesh to less than 2^16
-OpenJsCad.Viewer.csgToMeshes = function(csg) {
-  var csg = csg.canonicalized();
+OpenJsCad.Viewer.csgToMeshes = function(csg, defaultColor) {
+  csg = csg.canonicalized();
   var mesh = new GL.Mesh({ normals: true, colors: true });
   var meshes = [ mesh ];
   var vertexTag2Index = {};
@@ -256,13 +264,13 @@ OpenJsCad.Viewer.csgToMeshes = function(csg) {
   // set to true if we want to use interpolated vertex normals
   // this creates nice round spheres but does not represent the shape of
   // the actual model
-  var smoothlighting = false;   
+  var smoothlighting = false;
   var polygons = csg.toPolygons();
   var numpolygons = polygons.length;
   for(var polygonindex = 0; polygonindex < numpolygons; polygonindex++)
   {
     var polygon = polygons[polygonindex];
-    var color = [0,0,1];
+    var color = defaultColor || [0,0,1];
     if(polygon.shared && polygon.shared.color)
     {
       color = polygon.shared.color;
@@ -299,7 +307,7 @@ OpenJsCad.Viewer.csgToMeshes = function(csg) {
       triangles = [];
       colors = [];
       vertices = [];
-      meshes.push(mesh);	
+      meshes.push(mesh);
     }
   }
   // finalize last mesh
@@ -311,37 +319,23 @@ OpenJsCad.Viewer.csgToMeshes = function(csg) {
   return meshes;
 };
 
-// this is a bit of a hack; doesn't properly supports urls that start with '/'
-// but does handle relative urls containing ../
+// make a full url path out of a base path and url component.
+// url argument is interpreted as a folder name if it ends with a slash
 OpenJsCad.makeAbsoluteUrl = function(url, baseurl) {
   if(!url.match(/^[a-z]+\:/i))
   {
-    var basecomps = baseurl.split("/");
-    if(basecomps.length > 0)
-    {
-      basecomps.splice(basecomps.length - 1, 1);
+    var re = /^\/|\/$/g;
+    if (baseurl[baseurl.length - 1] != '/') {
+      // trailing part is a file, not part of base - remove
+      baseurl = baseurl.replace(/[^\/]*$/, "");
     }
-    var urlcomps = url.split("/");
-    var comps = basecomps.concat(urlcomps);
-    var comps2 = [];
-    comps.map(function(c) {
-      if(c == "..")
-      {
-        if(comps2.length > 0)
-        {
-          comps2.splice(comps2.length - 1, 1);
-        }
-      }
-      else
-      {
-        comps2.push(c);
-      }
-    });  
-    url = "";
-    for(var i = 0; i < comps2.length; i++)
-    {
-      if(i > 0) url += "/";
-      url += comps2[i];
+    if (url[0] == '/') {
+      var basecomps = baseurl.split('/');
+      url = basecomps[0] + '//' + basecomps[2] + '/' + url.replace(re, "");
+    }
+    else {
+      url = (baseurl.replace(re, "") + '/' + url.replace(re, ""))
+        .replace(/[^\/]+\/\.\.\//g, "");
     }
   }
   return url;
@@ -359,7 +353,7 @@ OpenJsCad.runMainInWorker = function(mainParameters)
   try
   {
     if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid or a CAG area.');
-    OpenJsCad.log.prevLogTime = Date.now();    
+    OpenJsCad.log.prevLogTime = Date.now();
     var result = main(mainParameters);
     OpenJsCad.checkResult(result);
     var result_compact = OpenJsCad.resultToCompactBinary(result);
@@ -372,11 +366,12 @@ OpenJsCad.runMainInWorker = function(mainParameters)
     if(!errtxt)
     {
       errtxt = e.toString();
-    } 
+    }
     self.postMessage({cmd: 'error', err: errtxt});
   }
 };
 
+// check whether the supplied script returns valid object(s)
 OpenJsCad.checkResult = function(result) {
   var ok=true;
   if(typeof(result) != "object")
@@ -461,7 +456,7 @@ OpenJsCad.resultFromCompactBinary = function(resultin) {
     {
       throw new Error("Cannot parse result");
     }
-    return result;   
+    return result;
   }
   var resultout;
   if(resultin instanceof Array)
@@ -490,13 +485,13 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
     workerscript += "F8  continues running\nPress the (||) button at the bottom to enable pausing whenever an error occurs\n";
     workerscript += "Click on a line number to set or clear a breakpoint\n";
     workerscript += "For more information see: http://code.google.com/chrome/devtools/docs/overview.html\n\n";
-    workerscript += "------------------------------------------------------------------------- */\n"; 
+    workerscript += "------------------------------------------------------------------------- */\n";
     workerscript += "\n\n// Now press F11 twice to enter your main() function:\n\n";
     workerscript += "debugger;\n";
   }
-  workerscript += "return main("+JSON.stringify(mainParameters)+");";  
+  workerscript += "return main("+JSON.stringify(mainParameters)+");";
   var f = new Function(workerscript);
-  OpenJsCad.log.prevLogTime = Date.now();    
+  OpenJsCad.log.prevLogTime = Date.now();
   var result = f();
   return result;
 };
@@ -510,12 +505,14 @@ OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, call
 
   var baseurl = document.location.href.replace(/\?.*$/, '');
   var openjscadurl = baseurl;
-  if (options['openJsCadPath'] != null) {
-    openjscadurl = OpenJsCad.makeAbsoluteUrl( options['openJsCadPath'], baseurl );
+  if (typeof options['openJsCadPath'] != 'undefined') {
+    // trailing '/' indicates it is a folder. This is necessary because makeAbsoluteUrl is called
+    // on openjscadurl
+    openjscadurl = OpenJsCad.makeAbsoluteUrl( options['openJsCadPath'], baseurl ) + '/';
   }
 
   var libraries = [];
-  if (options['libraries'] != null) {
+  if (typeof options['libraries'] != 'undefined') {
     libraries = options['libraries'];
   }
 
@@ -541,7 +538,7 @@ OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, call
   var worker = new Worker(blobURL);
   worker.onmessage = function(e) {
     if(e.data)
-    { 
+    {
       if(e.data.cmd == 'rendered')
       {
         var resulttype = e.data.result.class;
@@ -577,14 +574,14 @@ OpenJsCad.getWindowURL = function() {
 OpenJsCad.textToBlobUrl = function(txt) {
   var windowURL=OpenJsCad.getWindowURL();
   var blob = new Blob([txt]);
-  var blobURL = windowURL.createObjectURL(blob)
-  if(!blobURL) throw new Error("createObjectURL() failed"); 
+  var blobURL = windowURL.createObjectURL(blob);
+  if(!blobURL) throw new Error("createObjectURL() failed");
   return blobURL;
 };
 
 OpenJsCad.revokeBlobUrl = function(url) {
-  if(window.URL) window.URL.revokeObjectURL(url)
-  else if(window.webkitURL) window.webkitURL.revokeObjectURL(url)
+  if(window.URL) window.URL.revokeObjectURL(url);
+  else if(window.webkitURL) window.webkitURL.revokeObjectURL(url);
   else throw new Error("Your browser doesn't support window.URL");
 };
 
@@ -651,14 +648,24 @@ OpenJsCad.getParamDefinitions = function(script) {
   return params;
 };
 
-OpenJsCad.Processor = function(containerdiv, onchange) {
+/**
+ * options parameter:
+ * - showLines: display all triangle lines without respecting depth buffer
+ * - bgColor: canvas background color
+ * - color: object color
+ * - viewerwidth, viewerheight: set rendering size. If in pixels, both canvas resolution and
+ * display size are affected. If not (e.g. in %), canvas resolution is unaffected, but gets zoomed
+ * to display size
+ */
+OpenJsCad.Processor = function(containerdiv, options, onchange) {
   this.containerdiv = containerdiv;
   this.onchange = onchange;
   this.viewerdiv = null;
   this.viewer = null;
   this.zoomControl = null;
-  this.viewerwidth = 800;
-  this.viewerheight = 600;
+  this.options = options || {};
+  this.viewerwidth = this.options.viewerwidth || "800px";
+  this.viewerheight = this.options.viewerheight || "600px";
   this.initialViewerDistance = 200;
   this.processing = false;
   this.currentObject = null;
@@ -670,7 +677,6 @@ OpenJsCad.Processor = function(containerdiv, onchange) {
   this.script = null;
   this.hasError = false;
   this.debugging = false;
-  this.options = {};
   this.createElements();
 };
 
@@ -692,31 +698,37 @@ OpenJsCad.Processor.convertToSolid = function(obj) {
 };
 
 OpenJsCad.Processor.prototype = {
+  setLineDisplay: function(bool) {
+    // Draw triangle lines:
+    this.viewer.drawLines = bool;
+    // Set to true so lines don't use the depth buffer
+    this.viewer.lineOverlay = bool;
+  },
+
   createElements: function() {
     var that = this;//for event handlers
 
     while(this.containerdiv.children.length > 0)
     {
-      this.containerdiv.removeChild(0);
+      this.containerdiv.removeChild(this.containerdiv.children[0]);
     }
-/*    
-    if(!OpenJsCad.isChrome() )
-    {
-      var div = document.createElement("div");
-      div.innerHTML = "Please note: OpenJsCad currently only runs reliably on Google Chrome!";
-      this.containerdiv.appendChild(div);
-    }
-*/    
+  
     var viewerdiv = document.createElement("div");
     viewerdiv.className = "viewer";
-    viewerdiv.style.width = this.viewerwidth + "px";
-    viewerdiv.style.height = this.viewerheight + "px";
-    viewerdiv.style.backgroundColor = "rgb(200,200,200)";
+    viewerdiv.style.width = this.viewerwidth;
+    viewerdiv.style.height = this.viewerheight;
+    // viewerdiv.style.backgroundColor = "rgb(200,200,200)";
     this.containerdiv.appendChild(viewerdiv);
     this.viewerdiv = viewerdiv;
+    // if viewerdiv sizes in px -> size canvas accordingly. Else use 800x600, canvas will then scale
+    var wArr = this.viewerwidth.match(/^(\d+(?:\.\d+)?)(.*)$/);
+    var hArr = this.viewerheight.match(/^(\d+(?:\.\d+)?)(.*)$/);
+    var canvasW = wArr[2] == 'px' ? wArr[1] : '800';
+    var canvasH = hArr[2] == 'px' ? hArr[1] : '600';
     try
     {
-      this.viewer = new OpenJsCad.Viewer(this.viewerdiv, this.viewerwidth, this.viewerheight, this.initialViewerDistance);
+      this.viewer = new OpenJsCad.Viewer(this.viewerdiv, canvasW, canvasH,
+          this.initialViewerDistance, this.viewerwidth, this.viewerheight, this.options);
     } catch(e) {
       //      this.viewer = null;
       this.viewerdiv.innerHTML = "<b><br><br>Error: " + e.toString() + "</b><br><br>OpenJsCad requires a WebGL enabled browser. Try a recent version of Chrome of Firefox.";
@@ -725,11 +737,14 @@ OpenJsCad.Processor.prototype = {
     //Zoom control
     var div = document.createElement("div");
     this.zoomControl = div.cloneNode(false);
-    this.zoomControl.style.width = this.viewerwidth + 'px';
+    this.zoomControl.style.width = this.viewerwidth;
     this.zoomControl.style.height = '20px';
     this.zoomControl.style.backgroundColor = 'transparent';
     this.zoomControl.style.overflowX = 'scroll';
-    div.style.width = this.viewerwidth * 11 + 'px';
+    // div.style.width = this.viewerwidth * 11 + 'px';
+    // FIXME - below doesn't behave as expected if
+    // options.viewerwidth not in pixels
+    div.style.width = this.viewerdiv.canvasW * 11 + 'px';
     div.style.height = '1px';
     this.zoomControl.appendChild(div);
     this.zoomChangedBySlider=false;
@@ -749,7 +764,7 @@ OpenJsCad.Processor.prototype = {
           that.zoomControl.scrollLeft = newzoom * (10 * that.zoomControl.offsetWidth);
         }
       };
-      this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX * 
+      this.zoomControl.scrollLeft = this.viewer.viewpointZ / this.viewer.ZOOM_MAX *
         (this.zoomControl.scrollWidth - this.zoomControl.offsetWidth);
     }
 
@@ -759,7 +774,7 @@ OpenJsCad.Processor.prototype = {
     //end of zoom control
 
     this.errordiv = document.createElement("div");
-    this.errorpre = document.createElement("pre"); 
+    this.errorpre = document.createElement("pre");
     this.errordiv.appendChild(this.errorpre);
     this.statusdiv = document.createElement("div");
     this.statusdiv.className = "statusdiv";
@@ -811,7 +826,7 @@ OpenJsCad.Processor.prototype = {
       that.rebuildSolid();
     };
     this.parametersdiv.appendChild(parseParametersButton);
-    this.enableItems();    
+    this.enableItems();
     this.containerdiv.appendChild(this.statusdiv);
     this.containerdiv.appendChild(this.errordiv);
     this.containerdiv.appendChild(this.parametersdiv);
@@ -839,7 +854,7 @@ OpenJsCad.Processor.prototype = {
 
   setRenderedObjects: function(obj) {
     // if obj is a single CSG or CAG, convert to the array format:
-    if(obj === null) 
+    if(obj === null)
     {
       obj=[];
     }
@@ -897,7 +912,7 @@ OpenJsCad.Processor.prototype = {
     this.currentObject = obj;
     if(this.viewer)
     {
-      var csg = OpenJsCad.Processor.convertToSolid(obj); 
+      var csg = OpenJsCad.Processor.convertToSolid(obj);
       this.viewer.setCsg(csg);
     }
     this.hasValidCurrentObject = true;
@@ -955,7 +970,7 @@ OpenJsCad.Processor.prototype = {
     this.downloadOutputFileLink.style.display = this.hasOutputFile? "inline":"none";
     this.parametersdiv.style.display = (this.paramControls.length > 0)? "block":"none";
     this.errordiv.style.display = this.hasError? "block":"none";
-    this.statusdiv.style.display = this.hasError? "none":"block";    
+    this.statusdiv.style.display = this.hasError? "none":"block";
   },
 
   setOpenJsCadPath: function(path) {
@@ -963,7 +978,7 @@ OpenJsCad.Processor.prototype = {
   },
 
   addLibrary: function(lib) {
-    if( this.options[ 'libraries' ] == null ) {
+    if( typeof this.options[ 'libraries' ] == 'undefined' ) {
       this.options[ 'libraries' ] = [];
     }
     this.options[ 'libraries' ].push( lib );
@@ -1040,7 +1055,7 @@ OpenJsCad.Processor.prototype = {
           }
           if(type == "int")
           {
-            value = parseInt(value);
+            value = parseInt(value, 10);
           }
           else
           {
@@ -1165,7 +1180,7 @@ OpenJsCad.Processor.prototype = {
     
     var blob;
     if(format == "stl")
-    {      
+    {
       blob=this.currentObject.fixTJunctions().toStlBinary();
     }
     else if(format == "x3d") {
@@ -1178,7 +1193,7 @@ OpenJsCad.Processor.prototype = {
     else
     {
       throw new Error("Not supported");
-    }    
+    }
     return blob;
   },
   
@@ -1250,7 +1265,7 @@ OpenJsCad.Processor.prototype = {
                     fileWriter.onwriteend = function(e) {
                       that.hasOutputFile = true;
                       that.downloadOutputFileLink.href = fileEntry.toURL();
-                      that.downloadOutputFileLink.type = that.selectedFormatInfo().mimetype; 
+                      that.downloadOutputFileLink.type = that.selectedFormatInfo().mimetype;
                       that.downloadOutputFileLink.innerHTML = that.downloadLinkTextForCurrentObject();
                       that.downloadOutputFileLink.setAttribute("download", fileEntry.name);
                       that.enableItems();
@@ -1260,17 +1275,17 @@ OpenJsCad.Processor.prototype = {
                       throw new Error('Write failed: ' + e.toString());
                     };
                     var blob = that.currentObjectToBlob();
-                    fileWriter.write(blob);                
-                  }, 
-                  function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");} 
+                    fileWriter.write(blob);
+                  },
+                  function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "createWriter");}
                 );
               },
-              function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getFile('"+filename+"')");} 
+              function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getFile('"+filename+"')");}
             );
           },
-          function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getDirectory('"+dirname+"')");} 
-        );         
-      }, 
+          function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "getDirectory('"+dirname+"')");}
+        );
+      },
       function(fileerror){OpenJsCad.FileSystemApiErrorHandler(fileerror, "requestFileSystem");}
     );
   },
@@ -1332,7 +1347,7 @@ OpenJsCad.Processor.prototype = {
         if(!('values' in paramdef))
         {
           throw new Error(errorprefix + "Should include a 'values' parameter");
-        }        
+        }
         control = document.createElement("select");
         var values = paramdef.values;
         var captions;
@@ -1366,7 +1381,7 @@ OpenJsCad.Processor.prototype = {
         if(values.length > 0)
         {
           control.selectedIndex = selectedindex;
-        }        
+        }
       }
       else if(type == "longtext")
       {
@@ -1420,7 +1435,7 @@ OpenJsCad.Processor.prototype = {
     var that = this;
     tablerows.map(function(tr){
       that.parameterstable.appendChild(tr);
-    }); 
+    });
     this.paramControls = paramControls;
   },
 };
