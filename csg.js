@@ -1515,6 +1515,13 @@ CSG.parseOptionAs3DVector = function(options, optionname, defaultvalue) {
 	return result;
 };
 
+CSG.parseOptionAs3DVectorList = function(options, optionname, defaultvalue) {
+	var result = CSG.parseOption(options, optionname, defaultvalue);
+	return result.map(function(res) {
+		return new CSG.Vector3D(res);
+	});
+};
+
 // Parse an option and force into a CSG.Vector2D. If a scalar is passed it is converted
 // into a vector with equal x,y
 CSG.parseOptionAs2DVector = function(options, optionname, defaultvalue) {
@@ -2035,6 +2042,33 @@ CSG.roundedCube = function(options) {
 		new CSG.Connector(new CSG.Vector3D([0, 0, cuberadius.z]).plus(center), [0, 0, 1], [1, 0, 0]),
 		new CSG.Connector(new CSG.Vector3D([0, 0, -cuberadius.z]).plus(center), [0, 0, -1], [1, 0, 0])];
 	return result;
+};
+
+/**
+ * polyhedron accepts openscad style arguments. I.e. define face vertices clockwise looking from outside
+ */
+CSG.polyhedron = function(options) {
+	options = options || {};
+	if (('points' in options) !== ('faces' in options)) {
+		throw new Error("polyhedron needs 'points' and 'faces' arrays");
+	}
+	var vertices = CSG.parseOptionAs3DVectorList(options, "points", [[1,1,0],[1,-1,0],[-1,-1,0],[-1,1,0],[0,0,1]])
+	.map(function(pt) {
+			return new CSG.Vertex(pt);
+		});
+	var faces = CSG.parseOption(options, "faces", [[0,1,4],[1,2,4],[2,3,4],[3,0,4],[1,0,3],[2,1,3]])
+	// openscad convention defines inward normals - so we have to invert here
+	.map(function(face) {
+		return [face[1], face[0], face[2]];
+	});
+	var polygons = faces.map(function(face) {
+		return new CSG.Polygon(face.map(function(idx) {
+			return vertices[idx];
+		}));
+	});
+
+	// TODO: facecenters as connectors? probably overkill. Maybe centroid
+	return CSG.fromPolygons(polygons);
 };
 
 CSG.IsFloat = function(n) {
@@ -6323,6 +6357,7 @@ CSG.Polygon2D = function(points) {
 	this.sides = cag.sides;
 };
 CSG.Polygon2D.prototype = CAG.prototype;
+
 
 
 module.CSG = CSG;
