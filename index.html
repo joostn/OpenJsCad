@@ -318,7 +318,13 @@ var cube = CSG.roundedCube({
   resolution: 8,        // optional
 });
 
-// or alternatively by specifying two diagonally opposite corners:
+// a polyhedron (point ordering for faces: when looking at the face from the outside inwards, the points must be clockwise):
+var polyhedron = CSG.polyhedron({
+   points:[ [10,10,0],[10,-10,0],[-10,-10,0],[-10,10,0], // the four points at base
+            [0,0,10]  ],                                 // the apex point 
+   faces:[ [0,1,4],[1,2,4],[2,3,4],[3,0,4],              // each triangle side
+               [1,0,3],[2,1,3] ]                         // two triangles for square base
+});
 </pre>
  
 <h2>CSG operations</h2>
