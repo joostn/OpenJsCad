@@ -131,6 +131,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 
 OpenJsCad.Viewer.prototype = {
   setCsg: function(csg) {
+    this.gl.makeCurrent();
     this.meshes = OpenJsCad.Viewer.csgToMeshes(csg, this.color);
     this.onDraw();
   },
