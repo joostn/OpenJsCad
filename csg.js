@@ -1,6 +1,7 @@
 /*
 ## License
 
+Copyright (c) 2014 bebbi (elghatta@gmail.com)
 Copyright (c) 2013 Eduard Bespalov (edwbes@gmail.com)
 Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl)
 Copyright (c) 2011 Evan Wallace (http://evanw.github.com/csg.js/)
@@ -1492,6 +1493,35 @@ CSG.prototype = {
 			throw new Error("!sidemapisempty");
 		}
 		return csg;
+	},
+
+	toTriangles: function() {
+		var polygons = [];
+		this.polygons.forEach(function(poly) {
+			var firstVertex = poly.vertices[0];
+			for (var i = poly.vertices.length - 3; i >= 0; i--) {
+				polygons.push(new CSG.Polygon([
+					firstVertex, poly.vertices[i + 1], poly.vertices[i + 2]],
+					poly.shared, poly.plane));
+		}});
+		return polygons;
+	},
+
+	// features: string, or array containing 1 or more strings of: 'volume', 'area'
+	// more could be added here (Fourier coeff, moments)
+	getFeatures: function(features) {
+		if (!(features instanceof Array)) {
+			features = [features];
+		}
+		var result = this.toTriangles().map(function(triPoly) {
+			return triPoly.getTetraFeatures(features);
+		})
+		.reduce(function(pv, v) {
+			return v.map(function(feat, i) {
+				return feat + (pv === 0 ? 0 : pv[i]);
+			});
+		}, 0);
+		return (result.length == 1) ? result[0]: result;
 	}
 };
 
@@ -2651,6 +2681,33 @@ CSG.Polygon.prototype = {
 	setColor: function(color) {
 		this.shared = new CSG.Polygon.Shared(color);
 		return this;
+	},
+
+	// NOTE: _getSignedVolume only works on triangle polygons!
+	_getSignedVolume: function() {
+		return this.vertices[0].pos.dot(this.vertices[1].pos.cross(this.vertices[2].pos))/6;
+	},
+
+	// NOTE: _getArea only works on triangle polygons!
+	_getArea: function() {
+		return this.vertices[1].pos.minus(this.vertices[0].pos)
+				.cross(this.vertices[2].pos.minus(this.vertices[1].pos)).length()/2;
+	},
+
+
+	// accepts array of features to calculate
+	// returns array of results
+	getTetraFeatures: function(features) {
+		var result = [];
+		features.forEach(function(feature) {
+			if (feature == 'volume') {
+				result.push(this._getSignedVolume());
+			}
+			else if (feature == 'area') {
+				result.push(this._getArea());
+			}
+		}, this);
+		return result;
 	},
 
 	// Extrude a polygon into the direction offsetvector
