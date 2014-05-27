@@ -950,7 +950,26 @@ var point3d = new CSG.Vector3D(1,5,7);
 var point2d = orthobasis.to2D(point3d);
 var projected = orthobasis.to3D(point2d);
 </pre>
-  
+
+<h2>Getting features (volume and area)</h2>
+The volume and surface area of a solid can be calculated using getFeatures(). 
+For performance reasons, the function is designed such that it can calculate multiple features in a single pass.
+<pre>
+function main() {
+  var cube = CSG.cube({radius: 1});
+
+  // var volume = cube.getFeatures("volume");
+  // var area = cube.getFeatures("area");
+
+  var features = cube.getFeatures(["volume","area"]);
+  var volume = features[0];
+  var area = features[1];
+
+  OpenJsCad.log("volume: "+volume+"; area: "+area);   // volume: 8; area: 24 
+  return cube;
+}
+</pre>
+
 <h2>Miscellaneous</h2>
 Solids can be given a color using the setColor(r, g, b) function. Beware: this returns a new solid,
 the original solid is not modified! Faces of the solid will keep their original color when doing
