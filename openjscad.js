@@ -356,6 +356,7 @@ OpenJsCad.runMainInWorker = function(mainParameters)
     if(typeof(main) != 'function') throw new Error('Your jscad file should contain a function main() which returns a CSG solid or a CAG area.');
     OpenJsCad.log.prevLogTime = Date.now();
     var result = main(mainParameters);
+    result=OpenJsCad.expandResultObjectArray(result);
     OpenJsCad.checkResult(result);
     var result_compact = OpenJsCad.resultToCompactBinary(result);
     result = null; // not needed anymore
@@ -370,6 +371,21 @@ OpenJsCad.runMainInWorker = function(mainParameters)
     }
     self.postMessage({cmd: 'error', err: errtxt});
   }
+};
+
+// expand an array of CSG or CAG objects into an array of objects [{data: <CAG or CSG object>}]
+OpenJsCad.expandResultObjectArray = function(result) {
+    if(result instanceof Array)
+    {
+        result=result.map(function(resultelement){
+            if( (resultelement instanceof CSG) || (resultelement instanceof CAG) )
+            {
+                resultelement = {data: resultelement};
+            }
+            return resultelement;
+        });
+    }
+    return result;
 };
 
 // check whether the supplied script returns valid object(s)
@@ -398,6 +414,7 @@ OpenJsCad.checkResult = function(result) {
           {
             if( (resultelement.data instanceof CSG) || (resultelement.data instanceof CAG) )
             {
+              // ok
             }
             else
             {
@@ -418,7 +435,7 @@ OpenJsCad.checkResult = function(result) {
   }
   if(!ok)
   {
-    throw new Error("Your main() function does not return valid data. It should return one of the following: a CSG object, a CAG object, or an array of objects: [{name:, caption:, data:}, ...] where data contains a CSG or CAG object.");
+    throw new Error("Your main() function does not return valid data. It should return one of the following: a CSG object, a CAG object, an array of CSG/CAG objects, or an array of objects: [{name:, caption:, data:}, ...] where data contains a CSG or CAG object.");
   }
 };
 
@@ -494,6 +511,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
   var f = new Function(workerscript);
   OpenJsCad.log.prevLogTime = Date.now();
   var result = f();
+  result=OpenJsCad.expandResultObjectArray(result);
+  OpenJsCad.checkResult(result);
   return result;
 };
 

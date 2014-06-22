@@ -905,13 +905,19 @@ Or see the <a href="gearsdemo.html">Gears demo</a> for another example of intera
 In particular when laser cutting or CNC machining, an artwork often consists of multiple objects that will be machined separately.
 Usually the model is designed as a whole, and then the partial objects are created from the complete model.
 To facilitate this it's possible to return multiple objects from the main() function. This avoids
-the need to render the jscad file multiple times to get the STL or DXF file for each part. Returning multiple objects is done as follows:
+the need to render the jscad file multiple times to get the STL or DXF file for each part. Returning multiple objects 
+can be done simply by returning an array of CSG and/or CAG objects. Alternatively each object can be given a default file
+name and a caption by returning an object as follows:
 <pre>
 function main()
 {
   var mycube = CSG.cube({radius: 10});
   var mycircle = CAG.circle({radius: 10});
 
+  // we could just do:
+  // return [mycube, mycircle];
+
+  // give each element a description and filename:
   return [
     {
       name: "cube",              // optional, will be used as a prefix for the downloaded stl file
