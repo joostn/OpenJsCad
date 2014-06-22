@@ -6484,6 +6484,7 @@ CSG.addTransformationMethodsToPrototype(CSG.Path2D.prototype);
 CSG.addTransformationMethodsToPrototype(CSG.Line2D.prototype);
 CSG.addTransformationMethodsToPrototype(CAG.prototype);
 CSG.addTransformationMethodsToPrototype(CAG.Side.prototype);
+CSG.addTransformationMethodsToPrototype(CSG.OrthoNormalBasis.prototype);
 
 /*
   2D polygons are now supported through the CAG class.
