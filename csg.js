@@ -1108,7 +1108,7 @@ CSG.prototype = {
 	// Get the transformation that transforms this CSG such that it is lying on the z=0 plane,
 	// as flat as possible (i.e. the least z-height).
 	// So that it is in an orientation suitable for CNC milling
-	getTransformationToFlatLying: function() {
+	getTransformationAndInverseTransformationToFlatLying: function() {
 		if(this.polygons.length === 0) {
 			return new CSG.Matrix4x4(); // unity
 		} else {
@@ -1130,11 +1130,11 @@ CSG.prototype = {
 			var isfirst = true;
 			var minheight = 0;
 			var maxdotz = 0;
-			var besttransformation;
+			var besttransformation, bestinversetransformation;
 			for(var planetag in planemap) {
 				var plane = planemap[planetag];
 				var pointonplane = plane.normal.times(plane.w);
-				var transformation;
+				var transformation, inversetransformation;
 				// We need a normal vecrtor for the transformation
 				// determine which is more perpendicular to the plane normal: x or y?
 				// we will align this as much as possible to the x or y axis vector
@@ -1144,10 +1144,12 @@ CSG.prototype = {
 					// x is better:
 					var planeconnector = new CSG.Connector(pointonplane, plane.normal, xvector);
 					transformation = planeconnector.getTransformationTo(z0connectorx, false, 0);
+					inversetransformation=z0connectorx.getTransformationTo(planeconnector, false, 0);
 				} else {
 					// y is better:
 					var planeconnector = new CSG.Connector(pointonplane, plane.normal, yvector);
 					transformation = planeconnector.getTransformationTo(z0connectory, false, 0);
+					inversetransformation=z0connectory.getTransformationTo(planeconnector, false, 0);
 				}
 				var transformedcsg = csg.transform(transformation);
 				var dotz = -plane.normal.dot(zvector);
@@ -1163,19 +1165,26 @@ CSG.prototype = {
 				}
 				if(isbetter) {
 					// translate the transformation around the z-axis and onto the z plane:
-					var translation = [
+					var translation = new CSG.Vector3D([
 						-0.5 * (bounds[1].x + bounds[0].x),
 						-0.5 * (bounds[1].y + bounds[0].y),
-						-bounds[0].z];
+						-bounds[0].z]);
 					transformation = transformation.multiply(CSG.Matrix4x4.translation(translation));
+					inversetransformation=CSG.Matrix4x4.translation(translation.negated()).multiply(inversetransformation);
 					minheight = zheight;
 					maxdotz = dotz;
 					besttransformation = transformation;
+					bestinversetransformation=inversetransformation;
 				}
 				isfirst = false;
 			}
-			return besttransformation;
+			return [besttransformation, bestinversetransformation];
 		}
+	},
+
+	getTransformationToFlatLying: function() {
+		var result=this.getTransformationAndInverseTransformationToFlatLying();
+		return result[0];
 	},
 
 	lieFlat: function() {
