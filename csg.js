@@ -6211,6 +6211,82 @@ CAG.prototype = {
 	toDxf: function() {
 		var paths = this.getOutlinePaths();
 		return CAG.PathsToDxf(paths);
+	},
+
+	/*
+	cag = cag.overCutInsideCorners(cutterradius);
+
+	Using a CNC router it's impossible to cut out a true sharp inside corner. The inside corner
+	will be rounded due to the radius of the cutter. This function compensates for this by creating 
+	an extra cutout at each inner corner so that the actual cut out shape will be at least as large
+	as needed.
+	*/
+	overCutInsideCorners: function(cutterradius) {
+		var cag = this.canonicalized();
+		// for each vertex determine the 'incoming' side and 'outgoing' side:
+		var pointmap={};  // tag => {pos: coord, from: [], to: []}
+		cag.sides.map(function(side) {
+			if(!(side.vertex0.getTag() in pointmap))
+			{
+				pointmap[side.vertex0.getTag()]={pos: side.vertex0.pos, from: [], to: []};
+			}
+			pointmap[side.vertex0.getTag()].to.push(side.vertex1.pos);
+			if(!(side.vertex1.getTag() in pointmap))
+			{
+				pointmap[side.vertex1.getTag()]={pos: side.vertex1.pos, from: [], to: []};
+			}
+			pointmap[side.vertex1.getTag()].from.push(side.vertex0.pos);
+		});
+		// overcut all sharp corners:
+		var cutouts=[];
+		for(var pointtag in pointmap)
+		{
+			var pointobj=pointmap[pointtag];
+			if( (pointobj.from.length == 1) && (pointobj.to.length == 1) )
+			{
+				// ok, 1 incoming side and 1 outgoing side:
+				var fromcoord=pointobj.from[0];
+				var pointcoord=pointobj.pos;
+				var tocoord=pointobj.to[0];
+				var v1=pointcoord.minus(fromcoord).unit();
+				var v2=tocoord.minus(pointcoord).unit();
+				var crossproduct=v1.cross(v2);
+				var isInnerCorner=(crossproduct < 0.001);
+				if(isInnerCorner)
+				{
+					// yes it's a sharp corner:
+					var alpha=v2.angleRadians() - v1.angleRadians() + Math.PI;
+					if(alpha < 0)
+					{
+						alpha += 2*Math.PI;
+					}
+					else if(alpha >= 2*Math.PI)
+					{
+						alpha -= 2*Math.PI;
+					}
+					var midvector=v2.minus(v1).unit();
+					var circlesegmentangle=30/180*Math.PI; // resolution of the circle: segments of 30 degrees
+					// we need to increase the radius slightly so that our imperfect circle will contain a perfect circle of cutterradius
+					var radiuscorrected=cutterradius / Math.cos(circlesegmentangle/2);
+					var circlecenter=pointcoord.plus(midvector.times(radiuscorrected));
+					// we don't need to create a full circle; a pie is enough. Find the angles for the pie:
+					var startangle=alpha + midvector.angleRadians();
+					var deltaangle=2*(Math.PI-alpha);
+					var numsteps=2*Math.ceil(deltaangle/circlesegmentangle/2); // should be even
+					// build the pie:
+					var points=[circlecenter];
+					for(var i=0; i <= numsteps; i++)
+					{
+						var angle=startangle + i/numsteps*deltaangle;
+						var p=CSG.Vector2D.fromAngleRadians(angle).times(radiuscorrected).plus(circlecenter);
+						points.push(p);
+					}
+					cutouts.push(CAG.fromPoints(points));
+				}
+			}
+		}
+		var result=cag.subtract(cutouts);
+		return result;
 	}
 };
 
