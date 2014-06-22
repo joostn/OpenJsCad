@@ -560,7 +560,8 @@ This can be useful for CNC milling: it will transform a part of an object into t
 of the stock material during milling. Or for 3D printing: it is laid in such a way that it can be printed with
 minimal number of layers.
 Instead of lieFlat() the function getTransformationToFlatLying() can be used, which returns a CSG.Matrix4x4 for the 
-transformation.
+transformation. Or use getTransformationAndInverseTransformationToFlatLying() to get both the forward transformation
+and the reverse transformation.
 <pre>
 var cube1 = CSG.cube({radius: 10});
 var cube2 = CSG.cube({radius: 5});
@@ -580,6 +581,12 @@ cube3  = cube3.lieFlat();
 // or instead we could have used:
 var transformation = cube3.getTransformationToFlatLying();
 cube3 = cube3.transform(transformation);
+
+// or:
+var obj = cube3.getTransformationAndInverseTransformationToFlatLying();
+var forwardtransformation=obj[0];
+var backtransformation=obj[1];
+cube3 = cube3.transform(forwardtransformation);
 
 return cube3;
 
