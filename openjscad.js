@@ -364,10 +364,10 @@ OpenJsCad.runMainInWorker = function(mainParameters)
   }
   catch(e)
   {
-    var errtxt = e.stack;
-    if(!errtxt)
+    var errtxt = e.toString();
+    if(e.stack) 
     {
-      errtxt = e.toString();
+      errtxt += '\nStack trace:\n'+e.stack;
     }
     self.postMessage({cmd: 'error', err: errtxt});
   }
@@ -834,7 +834,7 @@ OpenJsCad.Processor.prototype = {
     this.parametersdiv = document.createElement("div");
     this.parametersdiv.className = "parametersdiv";
     var headerdiv = document.createElement("div");
-    headerdiv.innerText = "Parameters:";
+    headerdiv.textContent = "Parameters:";
     headerdiv.className = "header";
     this.parametersdiv.appendChild(headerdiv);
     this.parameterstable = document.createElement("table");
@@ -1006,7 +1006,7 @@ OpenJsCad.Processor.prototype = {
   
   setError: function(txt) {
     this.hasError = (txt != "");
-    this.errorpre.innerText = txt;
+    this.errorpre.textContent = txt;
     this.enableItems();
   },
   
@@ -1140,10 +1140,10 @@ OpenJsCad.Processor.prototype = {
       catch(e)
       {
         that.processing = false;
-        var errtxt = e.stack;
-        if(!errtxt)
+        var errtxt = e.toString();
+        if(e.stack) 
         {
-          errtxt = e.toString();
+          errtxt += '\nStack trace:\n'+e.stack;
         }
         that.setError(errtxt);
         that.statusspan.innerHTML = "Error.";
