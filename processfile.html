@@ -62,13 +62,23 @@ function setupDragDrop()
     evt.dataTransfer.dropEffect = 'copy';
   }, false);
   dropZone.addEventListener('drop', handleFileSelect, false);
+
+  var fileUploadButton = document.getElementById('fileUploadButton');
+  fileUploadButton.addEventListener('change', handleFileSelect);
+
 }
 
 function handleFileSelect(evt)
 {
+
   evt.stopPropagation();
   evt.preventDefault();
-  
+  if (evt.type == 'change') {
+    // this is from the file upload button
+    var fileUploadButton = document.getElementById('fileUploadButton');
+    evt.dataTransfer = {};
+    evt.dataTransfer.files = fileUploadButton.files;
+  }
   if(!evt.dataTransfer) throw new Error("Not a datatransfer (1)");
   if(!evt.dataTransfer.files) throw new Error("Not a datatransfer (2)");
   if(evt.dataTransfer.files.length != 1)
@@ -174,6 +184,7 @@ function parseFile(debugging, onlyifchanged)
 <h1>OpenJsCad parser</h1>
 <div id="viewer"></div>
 <br>
+
 <div id="filedropzone">
   <div id="filedropzone_empty">Drop your .jscad file here</div>
   <div id="filedropzone_filled">
@@ -186,6 +197,7 @@ function parseFile(debugging, onlyifchanged)
     </div>
   </div>
 </div>
+<input type="file" id="fileUploadButton" />
 <br>
 <h2>Instructions:</h2>
 Create a new file in your favorite text editor. To get started enter the following text:
