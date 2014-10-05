@@ -302,6 +302,16 @@ var cone = CSG.cylinder({
   resolution: 16        // optional
 });
 
+// a cone or cylinder sector:
+var coneSector = CSG.cylinder({
+  start: [0, 0, -1],
+  end: [0, 0, 1],
+  radiusStart: 2,
+  radiusEnd: 1,
+  sectorAngle: 90,
+  resolution: 16        // optional
+});
+
 // like a cylinder, but with spherical endpoints:
 var roundedCylinder = CSG.roundedCylinder({
   start: [0, -1, 0],

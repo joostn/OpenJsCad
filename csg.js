@@ -1779,6 +1779,8 @@ CSG.cylinder = function(options) {
 	var r = CSG.parseOptionAsFloat(options, "radius", 1);
 	var rEnd = CSG.parseOptionAsFloat(options, "radiusEnd", r);
 	var rStart = CSG.parseOptionAsFloat(options, "radiusStart", r);
+	var alpha = CSG.parseOptionAsFloat(options, "sectorAngle", 360);
+        alpha = alpha > 360 ? alpha % 360 : alpha;
 
 	if((rEnd < 0) || (rStart < 0)) {
 		throw new Error("Radius should be non-negative");
@@ -1799,34 +1801,47 @@ CSG.cylinder = function(options) {
 	var polygons = [];
 
 	function point(stack, slice, radius) {
-		var angle = slice * Math.PI * 2;
+		var angle = slice * Math.PI * alpha / 180;
 		var out = axisX.times(Math.cos(angle)).plus(axisY.times(Math.sin(angle)));
 		var pos = s.plus(ray.times(stack)).plus(out.times(radius));
 		return new CSG.Vertex(pos);
 	}
-	for(var i = 0; i < slices; i++) {
-		var t0 = i / slices,
-			t1 = (i + 1) / slices;
-		if(rEnd == rStart) {
-			polygons.push(new CSG.Polygon([start, point(0, t0, rEnd), point(0, t1, rEnd)]));
-			polygons.push(new CSG.Polygon([point(0, t1, rEnd), point(0, t0, rEnd), point(1, t0, rEnd), point(1, t1, rEnd)]));
-			polygons.push(new CSG.Polygon([end, point(1, t1, rEnd), point(1, t0, rEnd)]));
-		} else {
-			if(rStart > 0) {
-				polygons.push(new CSG.Polygon([start, point(0, t0, rStart), point(0, t1, rStart)]));
-				polygons.push(new CSG.Polygon([point(0, t0, rStart), point(1, t0, rEnd), point(0, t1, rStart)]));
-			}
-			if(rEnd > 0) {
+	if (alpha > 0) {
+		for(var i = 0; i < slices; i++) {
+			var t0 = i / slices,
+				t1 = (i + 1) / slices;
+			if(rEnd == rStart) {
+				polygons.push(new CSG.Polygon([start, point(0, t0, rEnd), point(0, t1, rEnd)]));
+				polygons.push(new CSG.Polygon([point(0, t1, rEnd), point(0, t0, rEnd), point(1, t0, rEnd), point(1, t1, rEnd)]));
 				polygons.push(new CSG.Polygon([end, point(1, t1, rEnd), point(1, t0, rEnd)]));
-				polygons.push(new CSG.Polygon([point(1, t0, rEnd), point(1, t1, rEnd), point(0, t1, rStart)]));
+			} else {
+				if(rStart > 0) {
+					polygons.push(new CSG.Polygon([start, point(0, t0, rStart), point(0, t1, rStart)]));
+					polygons.push(new CSG.Polygon([point(0, t0, rStart), point(1, t0, rEnd), point(0, t1, rStart)]));
+				}
+				if(rEnd > 0) {
+					polygons.push(new CSG.Polygon([end, point(1, t1, rEnd), point(1, t0, rEnd)]));
+					polygons.push(new CSG.Polygon([point(1, t0, rEnd), point(1, t1, rEnd), point(0, t1, rStart)]));
+				}
 			}
+		}
+		if (alpha < 360) {
+			polygons.push(new CSG.Polygon([start, end, point(0, 0, rStart)]));
+			polygons.push(new CSG.Polygon([point(0, 0, rStart), end, point(1, 0, rEnd)]));
+			polygons.push(new CSG.Polygon([start, point(0, 1, rStart), end]));
+			polygons.push(new CSG.Polygon([point(0, 1, rStart), point(1, 1, rEnd), end]));
 		}
 	}
 	var result = CSG.fromPolygons(polygons);
 	result.properties.cylinder = new CSG.Properties();
 	result.properties.cylinder.start = new CSG.Connector(s, axisZ.negated(), axisX);
 	result.properties.cylinder.end = new CSG.Connector(e, axisZ, axisX);
-	result.properties.cylinder.facepoint = s.plus(axisX.times(rStart));
+	var cylCenter = s.plus(ray.times(0.5));
+	var fptVec = axisX.rotate(s, axisZ, -alpha/2).times((rStart+rEnd)/2);
+	var fptVec90 = fptVec.cross(axisZ);
+	// note this one is NOT a face normal for a cone. - It's horizontal from cyl perspective
+	result.properties.cylinder.facepointH = new CSG.Connector(cylCenter.plus(fptVec), fptVec, axisZ);
+	result.properties.cylinder.facepointH90 = new CSG.Connector(cylCenter.plus(fptVec90), fptVec90, axisZ);
 	return result;
 };
 
