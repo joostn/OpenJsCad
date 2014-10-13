@@ -2122,7 +2122,10 @@ CSG.polyhedron = function(options) {
 	});
 
 	// TODO: facecenters as connectors? probably overkill. Maybe centroid
-	return CSG.fromPolygons(polygons);
+	// the re-tesselation here happens because it's so easy for a user to
+	// create parametrized polyhedrons that end up with 1-2 dimensional polygons.
+	// These will create infinite loops at CSG.Tree()
+	return CSG.fromPolygons(polygons).reTesselated();
 };
 
 CSG.IsFloat = function(n) {
