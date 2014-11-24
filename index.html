@@ -662,7 +662,7 @@ shape=shape.rotateZ(20);
 shape=shape.scale([0.7, 0.9]);
 
 // And extrude. This creates a CSG solid:
-var extruded=shape.extrude({
+var extruded = shape.extrude({
   offset: [0.5, 0, 10],   // direction for extrusion
   twistangle: 30,       // top surface is rotated 30 degrees 
   twiststeps: 10        // create 10 slices
@@ -670,7 +670,16 @@ var extruded=shape.extrude({
 
 // extrude such that the 2D x coordinate maps to the 3D negated z coordinate, 
 // and the 2D y coordinate maps to the 3D x coordinate:
-var extruded2=shape.extrudeInPlane("-Z","X", 10);
+var extruded2 = shape.extrudeInPlane("-Z","X", 10);
+
+
+// extrude by rotation around y-axis at the origin.
+// Note: for this to work, shape shouldn't have point in negative x space
+var shapeX = shape.translate([20, 0]);
+var rotExtruded = shapeX.rotateExtrude({
+  angle: 210,        // degrees of rotation; 360 deg if left out
+  resolution: 200    // resolution, optional
+});
 
 var cube2d = CSG.cube({radius: 10}).rotateZ(45);
 var z0basis = CSG.OrthoNormalBasis.Z0Plane();
