@@ -354,12 +354,12 @@ for solid CAD anyway.
 
         // Return a new CSG solid with solid and empty space switched. This solid is
         // not modified.
-        inverse: function() {
+        invert: function() {
             var flippedpolygons = this.polygons.map(function(p) {
                 return p.flipped();
             });
             return CSG.fromPolygons(flippedpolygons);
-            // TODO: flip properties
+            // TODO: flip properties?
         },
 
         // Affine transformation of CSG object. Returns a new CSG object
@@ -5517,7 +5517,7 @@ for solid CAD anyway.
     };
 
     // Converts a CSG to a CAG. The CSG must consist of polygons with only z coordinates +1 and -1
-    // as constructed by CAG.toCSG(-1, 1). This is so we can use the 3D union(), intersect() etc
+    // as constructed by CAG._toCSGWall(-1, 1). This is so we can use the 3D union(), intersect() etc
     CAG.fromFakeCSG = function(csg) {
         var sides = csg.polygons.map(function(p) {
             return CAG.Side.fromFakePolygon(p);
@@ -5680,37 +5680,108 @@ for solid CAD anyway.
             return result;
         },
 
-        toCSG: function(z0, z1) {
+        _toCSGWall: function(z0, z1) {
             var polygons = this.sides.map(function(side) {
                 return side.toPolygon3D(z0, z1);
             });
             return CSG.fromPolygons(polygons);
         },
 
-        toDebugString1: function() {
-            this.sides.sort(function(a, b) {
-                return a.vertex0.pos.x - b.vertex0.pos.x;
+        _toVector3DPairs: function(m) {
+            // transform m
+            var pairs = this.sides.map(function(side) {
+                var p0 = side.vertex0.pos, p1 = side.vertex1.pos;
+                return [CSG.Vector3D.Create(p0.x, p0.y, 0),
+                    CSG.Vector3D.Create(p1.x, p1.y, 0)];
             });
-            var str = "";
-            this.sides.map(function(side) {
-                str += "(" + side.vertex0.pos.x + "," + side.vertex0.pos.y + ") - (" + side.vertex1.pos.x + "," + side.vertex1.pos.y + ")\n";
-            });
-            return str;
+            if (typeof m != 'undefined') {
+                pairs = pairs.map(function(pair) {
+                    return pair.map(function(v) {
+                        return v.transform(m);
+                    });
+                }); 
+            }
+            return pairs;
         },
 
-        toDebugString: function() {
-            //    this.sides.sort(function(a,b){
-            //      return a.vertex0.pos.x - b.vertex0.pos.x;
-            //    });
-            var str = "CAG.fromSides([\n";
-            this.sides.map(function(side) {
-                str += "  new CAG.Side(new CAG.Vertex(new CSG.Vector2D(" +
-                    side.vertex0.pos.x + "," + side.vertex0.pos.y +
-                    ")), new CAG.Vertex(new CSG.Vector2D(" +
-                    side.vertex1.pos.x + "," + side.vertex1.pos.y + "))),\n";
+        /*
+         * transform a cag into the polygons of a corresponding 3d plane, positioned per options
+         * Accepts a connector for plane positioning, or optionally
+         * single translation, axisVector, normalVector arguments
+         * (toConnector has precedence over single arguments if provided)
+         */
+        _toPlanePolygons: function(options) {
+            var flipped = options.flipped || false;
+            // reference connector for transformation
+            var origin = [0, 0, 0], defaultAxis = [0, 0, 1], defaultNormal = [0, 1, 0];
+            var thisConnector = new CSG.Connector(origin, defaultAxis, defaultNormal);
+            // translated connector per options
+            var translation = options.translation || origin;
+            var axisVector = options.axisVector || defaultAxis;
+            var normalVector = options.normalVector || defaultNormal;
+            // will override above if options has toConnector
+            var toConnector = options.toConnector ||
+                new CSG.Connector(translation, axisVector, normalVector);
+            // resulting transform
+            var m = thisConnector.getTransformationTo(toConnector, false, 0);
+            // create plane as a (partial non-closed) CSG in XY plane
+            var bounds = this.getBounds();
+            bounds[0] = bounds[0].minus(new CSG.Vector2D(1, 1));
+            bounds[1] = bounds[1].plus(new CSG.Vector2D(1, 1));
+            var csgshell = this._toCSGWall(-1, 1);
+            var csgplane = CSG.fromPolygons([new CSG.Polygon([
+                new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[0].y, 0)),
+                new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[0].y, 0)),
+                new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[1].y, 0)),
+                new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[1].y, 0))
+            ])]);
+            if (flipped) {
+                csgplane = csgplane.invert();
+            }
+            csgplane = csgplane.intersect(csgshell);
+            // only keep the polygons in the z plane:
+            var polys = csgplane.polygons.filter(function(polygon) {
+                return Math.abs(polygon.plane.normal.z) > 0.99;
             });
-            str += "]);\n";
-            return str;
+            // finally, position the plane per passed transformations
+            return polys.map(function(poly) {
+                return poly.transform(m);
+            });
+        },
+
+
+        /*
+         * given 2 connectors, this returns all polygons of a "wall" between 2
+         * copies of this cag, positioned in 3d space as "bottom" and
+         * "top" plane per connectors toConnector1, and toConnector2, respectively 
+         */
+        _toWallPolygons: function(options) {
+            // normals are going to be correct as long as toConn2.point - toConn1.point
+            // points into cag normal direction (check in caller)
+            // options needs to have 2 connectors, walls go from
+            // toConnector1 to toConnector2
+            var origin = [0, 0, 0], defaultAxis = [0, 0, 1], defaultNormal = [0, 1, 0];
+            var thisConnector = new CSG.Connector(origin, defaultAxis, defaultNormal);
+            // arguments:
+            var toConnector1 = options.toConnector1;
+            // var toConnector2 = new CSG.Connector([0, 0, -30], defaultAxis, defaultNormal);
+            var toConnector2 = options.toConnector2;
+            if (!(toConnector1 instanceof CSG.Connector && toConnector2 instanceof CSG.Connector)) {
+                throw('could not parse CSG.Connector arguments toConnector1 or toConnector2');
+            }
+            var m1 = thisConnector.getTransformationTo(toConnector1, false, 0);
+            var m2 = thisConnector.getTransformationTo(toConnector2, false, 0);
+            var vps1 = this._toVector3DPairs(m1);
+            var vps2 = this._toVector3DPairs(m2);
+
+            var polygons = [];
+            vps1.forEach(function(vp1, i) {
+                polygons.push(new CSG.Polygon([
+                    new CSG.Vertex(vps2[i][1]), new CSG.Vertex(vps2[i][0]), new CSG.Vertex(vp1[0])]));
+                polygons.push(new CSG.Polygon([
+                    new CSG.Vertex(vps2[i][1]), new CSG.Vertex(vp1[0]), new CSG.Vertex(vp1[1])]));
+            });
+            return polygons;
         },
 
         union: function(cag) {
@@ -5720,9 +5791,9 @@ for solid CAD anyway.
             } else {
                 cags = [cag];
             }
-            var r = this.toCSG(-1, 1);
+            var r = this._toCSGWall(-1, 1);
             cags.map(function(cag) {
-                r = r.unionSub(cag.toCSG(-1, 1), false, false);
+                r = r.unionSub(cag._toCSGWall(-1, 1), false, false);
             });
             r = r.reTesselated();
             r = r.canonicalized();
@@ -5738,9 +5809,9 @@ for solid CAD anyway.
             } else {
                 cags = [cag];
             }
-            var r = this.toCSG(-1, 1);
+            var r = this._toCSGWall(-1, 1);
             cags.map(function(cag) {
-                r = r.subtractSub(cag.toCSG(-1, 1), false, false);
+                r = r.subtractSub(cag._toCSGWall(-1, 1), false, false);
             });
             r = r.reTesselated();
             r = r.canonicalized();
@@ -5756,9 +5827,9 @@ for solid CAD anyway.
             } else {
                 cags = [cag];
             }
-            var r = this.toCSG(-1, 1);
+            var r = this._toCSGWall(-1, 1);
             cags.map(function(cag) {
-                r = r.intersectSub(cag.toCSG(-1, 1), false, false);
+                r = r.intersectSub(cag._toCSGWall(-1, 1), false, false);
             });
             r = r.reTesselated();
             r = r.canonicalized();
@@ -5963,78 +6034,71 @@ for solid CAD anyway.
                 // empty!
                 return new CSG();
             }
-            var offsetvector = CSG.parseOptionAs3DVector(options, "offset", [0, 0, 1]);
+            var offsetVector = CSG.parseOptionAs3DVector(options, "offset", [0, 0, 1]);
             var twistangle = CSG.parseOptionAsFloat(options, "twistangle", 0);
-            var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", 10);
+            var twiststeps = CSG.parseOptionAsInt(options, "twiststeps", CSG.defaultResolution3D);
+            if (offsetVector.z == 0) {
+                throw('offset cannot be orthogonal to Z axis');
+            }
+            if (twistangle == 0 || twiststeps < 1) {
+                twiststeps = 1;
+            }
+            var normalVector = CSG.Vector3D.Create(0, 1, 0);
 
-            if (twistangle == 0) twiststeps = 1;
-            if (twiststeps < 1) twiststeps = 1;
+            var polygons = [];
+            // bottom and top
+            polygons = polygons.concat(this._toPlanePolygons({translation: [0, 0, 0],
+                normalVector: normalVector, flipped: offsetVector.z < 0 ? false:true}));
+            polygons = polygons.concat(this._toPlanePolygons({translation: offsetVector,
+                normalVector: normalVector.rotateZ(twistangle), flipped: offsetVector.z < 0 ? true:false}));
+            // walls
+            for (var i = 0; i < twiststeps; i++) {
+                var c1 = new CSG.Connector(offsetVector.times(i / twiststeps), [0, 0, offsetVector.z], 
+                    normalVector.rotateZ(i * twistangle/twiststeps));
+                var c2 = new CSG.Connector(offsetVector.times((i + 1) / twiststeps), [0, 0, offsetVector.z],
+                    normalVector.rotateZ((i + 1) * twistangle/twiststeps));
+                polygons = polygons.concat(this._toWallPolygons({toConnector1: c1, toConnector2: c2}));
+            }
 
-            var newpolygons = [];
-            var prevtransformedcag;
-            var prevstepz;
-            for (var step = 0; step <= twiststeps; step++) {
-                var stepfraction = step / twiststeps;
-                var transformedcag = this;
-                var angle = twistangle * stepfraction;
-                if (angle != 0) {
-                    transformedcag = transformedcag.rotateZ(angle);
-                }
-                var translatevector = new CSG.Vector2D(offsetvector.x, offsetvector.y).times(stepfraction);
-                transformedcag = transformedcag.translate(translatevector);
-                var bounds = transformedcag.getBounds();
-                bounds[0] = bounds[0].minus(new CSG.Vector2D(1, 1));
-                bounds[1] = bounds[1].plus(new CSG.Vector2D(1, 1));
-                var stepz = offsetvector.z * stepfraction;
-                if ((step == 0) || (step == twiststeps)) {
-                    // bottom or top face:
-                    var csgshell = transformedcag.toCSG(stepz - 1, stepz + 1);
-                    var csgplane = CSG.fromPolygons([new CSG.Polygon([
-                        new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[0].y, stepz)),
-                        new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[0].y, stepz)),
-                        new CSG.Vertex(new CSG.Vector3D(bounds[1].x, bounds[1].y, stepz)),
-                        new CSG.Vertex(new CSG.Vector3D(bounds[0].x, bounds[1].y, stepz))
-                    ])]);
-                    var flip = (step == 0);
-                    if (offsetvector.z < 0) flip = !flip;
-                    if (flip) {
-                        csgplane = csgplane.inverse();
-                    }
-                    csgplane = csgplane.intersect(csgshell);
-                    // only keep the polygons in the z plane:
-                    csgplane.polygons.map(function(polygon) {
-                        if (Math.abs(polygon.plane.normal.z) > 0.99) {
-                            newpolygons.push(polygon);
-                        }
-                    });
-                }
-                if (step > 0) {
-                    var numsides = transformedcag.sides.length;
-                    for (var sideindex = 0; sideindex < numsides; sideindex++) {
-                        var thisside = transformedcag.sides[sideindex];
-                        var prevside = prevtransformedcag.sides[sideindex];
-                        var p1 = new CSG.Polygon([
-                            new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
-                            new CSG.Vertex(thisside.vertex0.pos.toVector3D(stepz)),
-                            new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz))
-                        ]);
-                        var p2 = new CSG.Polygon([
-                            new CSG.Vertex(thisside.vertex1.pos.toVector3D(stepz)),
-                            new CSG.Vertex(prevside.vertex0.pos.toVector3D(prevstepz)),
-                            new CSG.Vertex(prevside.vertex1.pos.toVector3D(prevstepz))
-                        ]);
-                        if (offsetvector.z < 0) {
-                            p1 = p1.flipped();
-                            p2 = p2.flipped();
-                        }
-                        newpolygons.push(p1);
-                        newpolygons.push(p2);
-                    }
-                }
-                prevtransformedcag = transformedcag;
-                prevstepz = stepz;
-            } // for step
-            return CSG.fromPolygons(newpolygons);
+            return CSG.fromPolygons(polygons);
+        },
+
+        /*
+         * extrude CAG to 3d object by rotating the origin around the y axis
+         * (and turning everything into XY plane)
+         * arguments: options dict with angle and resolution, both optional
+         */
+        rotateExtrude: function(options) {
+            var alpha = CSG.parseOptionAsFloat(options, "angle", 360);
+            var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution3D);
+
+            var EPS = 1e-5;
+
+            alpha = alpha > 360 ? alpha % 360 : alpha;
+            var origin = [0, 0, 0];
+            var axisV = CSG.Vector3D.Create(0, 1, 0);
+            var normalV = [0, 0, 1];
+            var polygons = [];
+            // planes only needed if alpha > 0
+            var connS = new CSG.Connector(origin, axisV, normalV);
+            if (alpha > 0 || alpha < 360) {
+                // we need to rotate negative to satisfy wall function condition of
+                // building in the direction of axis vector
+                var connE = new CSG.Connector(origin, axisV.rotateZ(-alpha), normalV);
+                polygons = polygons.concat(
+                    this._toPlanePolygons({toConnector: connS, flipped: true}));
+                polygons = polygons.concat(
+                    this._toPlanePolygons({toConnector: connE}));
+            }
+            var connT1 = connS, connT2;
+            var step = alpha/resolution;
+            for (var a = step; a <= alpha + EPS; a += step) {
+                connT2 = new CSG.Connector(origin, axisV.rotateZ(-a), normalV);
+                polygons = polygons.concat(this._toWallPolygons(
+                    {toConnector1: connT1, toConnector2: connT2}));
+                connT1 = connT2;
+            }
+            return CSG.fromPolygons(polygons);
         },
 
         // check if we are a valid CAG (for debugging)
