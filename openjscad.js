@@ -1204,7 +1204,7 @@ OpenJsCad.Processor.prototype = {
       blob=this.currentObject.fixTJunctions().toStlBinary();
     }
     else if(format == "x3d") {
-      blob=this.currentObject.fixTJunctions().toX3D(bb);
+      blob=this.currentObject.fixTJunctions().toX3D();
     }
     else if(format == "dxf")
     {
