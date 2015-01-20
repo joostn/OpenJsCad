@@ -1,71 +1,3 @@
-<!DOCTYPE html>
-
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: servo motor</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: servo motor</h1>
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code" style="height: 500px">
 // This demo intends to show how to use properties and connectors.
 // The servoMotor() function constructs the shape of a standard servo
 // It also defines a property for the cutout shape, and a connector property
@@ -76,15 +8,15 @@ and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more inf
 //
 // The cutout shape is automatically transformed with every transformation of
 // the servo. We can simply subtract it from an object to make space for the servo
-// motor. 
+// motor.
 function main(params)
 {
   // the servo motor solid:
-  var servo = servoMotor();  
-  
+  var servo = servoMotor();
+
   // the plate:
   var plate = CSG.cube({radius: [40,40,4]});
-  
+
   // Define a Connector on the plate, at the place where we want to attach the servo:
   plate.properties.servoConnector = new CSG.Connector(
     [0, 0, 4],    // point
@@ -98,14 +30,14 @@ function main(params)
   // now we really don't know the orientation of the plane anymore!
 
   // Still we can perfectly align the servo motor to the plane at the servoConnector
-  // point that we decided on earlier: 
+  // point that we decided on earlier:
   servo = servo.connectTo(
     servo.properties.servomotor.surfaceConnector,   // the servo's pre defined Connector
     plate.properties.servoConnector,                // the connector on the surface
-    false,                                          // we don't want to mirror; the Connector's axes should point in the same direction 
+    false,                                          // we don't want to mirror; the Connector's axes should point in the same direction
     0                                               // normalrotation; we could use it to rotate the servo in the plane
-  );  
-  
+  );
+
   // Construct the result; use the parameters set by the end user:
   var result = new CSG();
   if(params.cutout != 0) plate = plate.subtract(servo.properties.servomotor.cutout);
@@ -116,7 +48,7 @@ function main(params)
   return result;
 }
 
-// Here we define the user editable parameters: 
+// Here we define the user editable parameters:
 function getParameterDefinitions() {
   return [
     { name: 'showservo', caption: 'Show servo:', type: 'choice', values: [0, 1], default: 1, captions: ["No", "Yes"]},
@@ -126,7 +58,7 @@ function getParameterDefinitions() {
   ];
 }
 
-// The servoMotor() function constructs the shape of a standard '3003' servo 
+// The servoMotor() function constructs the shape of a standard '3003' servo
 // Returns a CSG solid. The solid has the following additional properties:
 //    .properties.servomotor.cutout: a CSG solid that can be used to create a cutout for the servo motor (including screw holes)
 //    .properties.servomotor.surfaceConnector: a CSG.Connector that can be used to attach the servo motor to a surface
@@ -138,27 +70,27 @@ function servoMotor()
   var h2 = 29;
   var h4 = 35.9;
   var l1 = 55.4;
-  var w1 = 17.8;  
+  var w1 = 17.8;
   var holeradius = 2.1;
   var holex1 = 2 * 2.54;
   var holey1 = 9.5 * 2.54;
-  var cutoutmargin = 1;  
+  var cutoutmargin = 1;
   var shaftradius = 3;
   var shafty = 9.25;
-  var shafttop = 43; 
+  var shafttop = 43;
   var cyl2radius = 7;
   var cyl2height = 2;
-  
+
   var resolution = 16; // for all circular objects
-  
+
   // result: this is the solid in which we will store the servomotor
   var result = CSG.cube({radius:[width/2, length/2, h4/2]});
-  
+
   // cutout: this is the solid for the cutout. It is never rendered directly,
   // but it will be returned as a property of the resulting solid.
   // it can be used to cutout the shape of the servo motor and screw holes
   // from another solid
-  var cutout = CSG.cube({radius:[width/2+cutoutmargin, length/2+cutoutmargin, h4/2+cutoutmargin]}); 
+  var cutout = CSG.cube({radius:[width/2+cutoutmargin, length/2+cutoutmargin, h4/2+cutoutmargin]});
 
   // add a 'bottomface' property. Since the cube already has predifined connectors at each face,
   // we can just copy the 5th:
@@ -167,49 +99,49 @@ function servoMotor()
 
   // get the z coordinate of the bottom face:
   var bottomz = result.properties.servomotor.bottomface.point.z;
-  
+
   // the tabs at the end containing the screw holes:
   var cube2 = CSG.cube({radius:[w1/2, l1/2, (h2-h1)/2]});
   cube2 = cube2.translate([0, 0, (h2-h1)/2 + bottomz + h1]);
   result = result.union(cube2);
-  
+
   // create the cylinders for cutting out the screw holes:
   for(var hole = 0; hole < 4; hole++)
   {
     var xoffset = (hole & 1)? holex1 : -holex1;
     var yoffset = (hole & 2)? holey1 : -holey1;
-    var cylstart = new CSG.Vector3D([xoffset, yoffset, bottomz+h2]); 
-    var cylend = new CSG.Vector3D([xoffset, yoffset, bottomz]); 
+    var cylstart = new CSG.Vector3D([xoffset, yoffset, bottomz+h2]);
+    var cylend = new CSG.Vector3D([xoffset, yoffset, bottomz]);
     var cutoutcylinder = CSG.cylinder({start: cylstart, end: cylend, radius: holeradius, resolution: resolution});
-    
+
     // create the screw hole in the tabs:
     result = result.subtract(cutoutcylinder);
 
     // And also add the cutout cylinder to the cutout shape:
     cutout = cutout.union(cutoutcylinder);
   }
-  
+
   // cylinder at top:
   var p1 = new CSG.Vector3D([0, shafty, bottomz+h4]);
   p2 = p1.plus(new CSG.Vector3D([0, 0, cyl2height]));
   var cyl = CSG.cylinder({start: p1, end: p2, radius: cyl2radius, resolution: resolution});
   result = result.union(cyl);
-  
+
   // make the entire motor grey:
   result = result.setColor(0.2,0.2,0.2);
-  
+
   // create the shaft:
   p1 = new CSG.Vector3D([0, shafty, bottomz+h4]);
   p2 = p1.plus(new CSG.Vector3D([0, 0, cyl2height]));
   var shaft = CSG.cylinder({start: [0, shafty, bottomz+h4], end: [0, shafty, bottomz+shafttop], radius: shaftradius, resolution: resolution});
   shaft = shaft.setColor(1,1,1);
   result = result.union(shaft);
-  
+
   // add the cutout solid to the properties:
   result.properties.servomotor.cutout = cutout;
-  
+
   // Add a Connector to facilitate proper alignment of the servo motor to a surface
-  //   The connector's point is at the x/y center of the box, in the bottom plane of the tabs 
+  //   The connector's point is at the x/y center of the box, in the bottom plane of the tabs
   //   The connector's axis points towards the top of the box
   //   The connector's normal points towards one of the tabs at the side
   result.properties.servomotor.surfaceConnector = new CSG.Connector(
@@ -217,11 +149,6 @@ function servoMotor()
     [0, 0, 1],             // axis
     [0, 1, 0]              // normal
   );
-  
+
   return result;
 }
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>

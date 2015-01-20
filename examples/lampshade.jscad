@@ -1,71 +1,3 @@
-<!DOCTYPE html>
-
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: Parametric Lamp Shade</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: Parametric Lamp Shade</h1>
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code" style="height: 500px">
 function main(params)
 {
   CSG.defaultResolution2D = (params.quality == "DRAFT")? 8:32;
@@ -77,9 +9,9 @@ function main(params)
   var thickness = params.thickness;
   var topholeradius = params.topholediameter/2;
   var cutterRadius = params.cutterdiameter / 2;
-  
+
   var solid = CSG.cube({radius: [1000, 1000, height/2]});
-  
+
   var plane = CSG.Plane.fromPoints([bottomradius, 0, -height/2], [bottomradius, 10, -height/2], [topradius, 0, height/2]);
   for(var i = 0; i < numfaces; i++)
   {
@@ -94,7 +26,7 @@ function main(params)
   {
     plates[i] = plates[0].rotateZ(i * 360 / numfaces);
   }
-  
+
   var topplate = getStockPlate(1000,1000,thickness)
     .subtract(CSG.cylinder({start: [0,0,-thickness], end:[ 0,0,thickness], radius: topholeradius}))
     .translate([0,0,height/2-thickness/2-10]);
@@ -112,9 +44,9 @@ function main(params)
     return plateCSGToCAG(plates[numfaces]);
   }
   else
-  {  
+  {
     var plate2d = plateCSGToCAG(plates[0]);
-    plate2d = addRandomHoles(plate2d); 
+    plate2d = addRandomHoles(plate2d);
     if(params.type == "SIDEPLATE")
     {
       return plate2d;
@@ -138,11 +70,11 @@ function addRandomHoles(plate)
   var distancefromedge = 8;
   var distancebetweenholes = 10;
   var mindiameter = 10;
-  var maxdiameter = 25; 
+  var maxdiameter = 25;
   // maskarea: the 'forbidden' area for holes:
   var maskarea = plate.contract(distancefromedge, 4);
   var bounds = maskarea.getBounds();
-  var maskarea = maskarea.flipped();  
+  var maskarea = maskarea.flipped();
   var holes = [];
   var existingholecenters = [];
   var existingholeradii = [];
@@ -151,7 +83,7 @@ function addRandomHoles(plate)
     for(var tryindex = 0; tryindex < 10; tryindex++)
     {
       var holeradius = (mindiameter + Math.random() * (maxdiameter - mindiameter))/2;
-      var x = bounds[0].x + holeradius + (bounds[1].x - bounds[0].x - holeradius*2) * Math.random(); 
+      var x = bounds[0].x + holeradius + (bounds[1].x - bounds[0].x - holeradius*2) * Math.random();
       var y = bounds[0].y + holeradius + (bounds[1].y - bounds[0].y - holeradius*2) * Math.random();
       var holecenter = new CSG.Vector2D(x,y);
       var valid = true;
@@ -161,10 +93,10 @@ function addRandomHoles(plate)
       {
         var d = holecenter.minus(existingholecenters[i2]).length();
         if(d < holeradius+existingholeradii[i2] + distancebetweenholes)
-        {        
+        {
           valid = false;
           break;
-        } 
+        }
       }
       if(valid)
       {
@@ -172,7 +104,7 @@ function addRandomHoles(plate)
         var hole = CAG.circle({radius: holeradius, center: holecenter});
         var testarea = maskarea.intersect(hole);
         if(testarea.sides.length != 0) valid = false;
-      } 
+      }
       if(valid)
       {
         existingholeradii.push(holeradius);
@@ -206,7 +138,7 @@ function plateCAGToCSG(plate2d, platebasis, thickness)
 
 function fixPlate(plate, thickness)
 {
-  return plateCAGToCSG(plateCSGToCAG(plate), plate.properties.platebasis, thickness); 
+  return plateCAGToCSG(plateCSGToCAG(plate), plate.properties.platebasis, thickness);
 }
 
 function removePlateWithNormal(plates, normalvector)
@@ -217,11 +149,11 @@ function removePlateWithNormal(plates, normalvector)
     if(!("platebasis" in plate.properties))
     {
       throw new Error("Plates should be created using getStockPlate()");
-    } 
+    }
     if(plate.properties.platebasis.plane.normal.dot(normalvector) < 0.9999)
     {
       result.push(plate);
-    } 
+    }
   });
   return result;
 }
@@ -254,12 +186,12 @@ function fingerJoint(plates, options)
   var numplates = plates.length;
   var maxdelta = Math.floor(numplates/2);
   for(var delta=1; delta <= maxdelta; delta++)
-  { 
+  {
     for(var plateindex1 = 0; plateindex1 < numplates; plateindex1++)
     {
       var plateindex2 = plateindex1 + delta;
-      if(plateindex2 >= numplates) plateindex2 -= numplates; 
-      
+      if(plateindex2 >= numplates) plateindex2 -= numplates;
+
       var joined = fingerJointTwo(result[plateindex1], result[plateindex2], options);
       result[plateindex1] = joined[0];
       result[plateindex2] = joined[1];
@@ -283,11 +215,11 @@ function fingerJointTwo(plate1, plate2, options)
   if(!("platebasis" in plate1.properties))
   {
     throw new Error("Plates should be created using getStockPlate()");
-  } 
+  }
   if(!("platebasis" in plate2.properties))
   {
     throw new Error("Plates should be created using getStockPlate()");
-  } 
+  }
   // get the intersection solid of the 2 plates:
   var intersection = plate1.intersect(plate2);
   if(intersection.polygons.length == 0)
@@ -297,7 +229,7 @@ function fingerJointTwo(plate1, plate2, options)
   }
   else
   {
-    var plane1 = plate1.properties.platebasis.plane; 
+    var plane1 = plate1.properties.platebasis.plane;
     var plane2 = plate2.properties.platebasis.plane;
     // get the intersection line of the 2 center planes:
     var jointline = plane1.intersectWithPlane(plane2);
@@ -311,19 +243,19 @@ function fingerJointTwo(plate1, plate2, options)
     // now transform the intersection solid:
     var intersection_transformed = intersection.transform(matrix);
     var bounds = intersection_transformed.getBounds();
-    // now we know the two edge points. The joint line runs from jointline_origin, in the 
-    // direction jointline_direction and has a length jointline_length (jointline_length >= 0) 
+    // now we know the two edge points. The joint line runs from jointline_origin, in the
+    // direction jointline_direction and has a length jointline_length (jointline_length >= 0)
     var jointline_origin = jointline.point.plus(jointline.direction.times(bounds[0].z));
     var jointline_direction = jointline.direction;
     var jointline_length = bounds[1].z - bounds[0].z;
-  
-    var fingerwidth = options.fingerWidth || (jointline_length / 4); 
+
+    var fingerwidth = options.fingerWidth || (jointline_length / 4);
     var numfingers=Math.round(jointline_length / fingerwidth);
     if(numfingers < 2) numfingers=2;
     fingerwidth = jointline_length / numfingers;
-    
+
     var margin = options.margin || 0;
-    var cutterRadius = options.cutterRadius || 0; 
+    var cutterRadius = options.cutterRadius || 0;
     var results = [];
     for(var plateindex = 0; plateindex < 2; plateindex++)
     {
@@ -339,9 +271,9 @@ function fingerJointTwo(plate1, plate2, options)
       bounds = intersection_transformed.getBounds();
       var maxz = bounds[1].z;
       var minz = bounds[0].z;
-      var maxy = bounds[1].y + margin/2; 
+      var maxy = bounds[1].y + margin/2;
       var miny = bounds[0].y - margin/2;
-      
+
       var cutouts2d = [];
       for(var fingerindex = 0; fingerindex < numfingers; fingerindex++)
       {
@@ -356,8 +288,8 @@ function fingerJointTwo(plate1, plate2, options)
       var cutout3d = cutout2d.extrude({offset: [0,0,maxz-minz]}).translate([0,0,minz]);
       cutout3d = cutout3d.transform(platebasis.getInverseProjectionMatrix());
       var thisplate_modified = thisplate.subtract(cutout3d);
-      results[plateindex] = thisplate_modified;  
-    } 
+      results[plateindex] = thisplate_modified;
+    }
     return results;
   }
 }
@@ -370,7 +302,7 @@ function fingerJointTwo(plate1, plate2, options)
 function createRectCutoutWithCutterRadius(minx, miny, maxx, maxy, cutterRadius, plate2d)
 {
   var deltax = maxx-minx;
-  var deltay = maxy-miny;  
+  var deltay = maxy-miny;
   var cutout = CAG.rectangle({radius: [(maxx-minx)/2, (maxy-miny)/2], center: [(maxx+minx)/2, (maxy+miny)/2]});
   var cornercutouts = [];
   if(cutterRadius > 0)
@@ -403,9 +335,9 @@ function createRectCutoutWithCutterRadius(minx, miny, maxx, maxy, cutterRadius, 
       var testrectbcenterx = (corner & 2)? (maxx+halfcutterradius):(minx-halfcutterradius);
       var testrectacentery = (corner & 1)? (maxy+halfcutterradius):(miny-halfcutterradius);
       var testrectbcentery = (corner & 1)? (maxy-halfcutterradius):(miny+halfcutterradius);
-      var testrecta = CAG.rectangle({radius: [halfcutterradius, halfcutterradius], center: [testrectacenterx, testrectacentery]}); 
+      var testrecta = CAG.rectangle({radius: [halfcutterradius, halfcutterradius], center: [testrectacenterx, testrectacentery]});
       var testrectb = CAG.rectangle({radius: [halfcutterradius, halfcutterradius], center: [testrectbcenterx, testrectbcentery]});
-      if( (plate2d.intersect(testrecta).sides.length > 0)  
+      if( (plate2d.intersect(testrecta).sides.length > 0)
        && (plate2d.intersect(testrectb).sides.length > 0) )
       {
         cornercutouts.push(cornercutout);
@@ -415,7 +347,7 @@ function createRectCutoutWithCutterRadius(minx, miny, maxx, maxy, cutterRadius, 
   if(cornercutouts.length > 0)
   {
     cutout = cutout.union(cornercutouts);
-  } 
+  }
   return cutout;
 }
 
@@ -439,9 +371,9 @@ function solidToOuterShellPlates(csg, thickness)
   {
     var polygons = plane2polygons[planetag];
     var plane = polygons[0].plane;
-    var shellcenterplane = new CSG.Plane(plane.normal, plane.w - thickness/2);    
+    var shellcenterplane = new CSG.Plane(plane.normal, plane.w - thickness/2);
     var basis = new CSG.OrthoNormalBasis(shellcenterplane);
-    var inversebasisprojection = basis.getInverseProjectionMatrix(); 
+    var inversebasisprojection = basis.getInverseProjectionMatrix();
     var csgcenter_projected = basis.to2D(csgcenter);
     var plate = getStockPlate(csgradius, csgradius, thickness).translate([csgcenter_projected.x, csgcenter_projected.y, 0]);
     plate = plate.transform(inversebasisprojection);
@@ -487,8 +419,3 @@ function getParameterDefinitions()
 
   ];
 }
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>

@@ -1,72 +1,5 @@
-<!DOCTYPE html>
 
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: involute gears</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: involute gears</h1>
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code">
-// Here we define the user editable parameters: 
+// Here we define the user editable parameters:
 function getParameterDefinitions() {
   return [
     { name: 'numTeeth', caption: 'Number of teeth:', type: 'int', default: 10 },
@@ -140,7 +73,7 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
     var tanvector = radvector.normal();
     var p = radvector.times(baseRadius).plus(tanvector.times(tanlength));
     points[i+1] = p;
-    
+
     // opposite side of the tooth:
     radvector = CSG.Vector2D.fromAngle(angularToothWidthAtBase - angle);    
     tanvector = radvector.normal().negated();
@@ -180,8 +113,3 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
 
   return result;
 }
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>

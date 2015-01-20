@@ -1,75 +1,3 @@
-<!DOCTYPE html>
-
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: Celtic knot ring</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: celtic knot ring</h1>
-<p>This only works in a WebGL-enabled browser (I've tested Firefox and Chrome)
-<p>By Daniel Risacher. This is a demo of OpenJsCad, but also the actual ring models that I'm getting cast in platinum for my 10th wedding anniversary.
-
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code">
-
 // -*- mode: javascript; -*-
 
 
@@ -78,13 +6,13 @@ and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more inf
 function getParameterDefinitions() {
   return [
     {
-      name: 'hisorhers', 
+      name: 'hisorhers',
       type: 'choice',
       caption: 'For Daniel or Zette:',
       values: [0, 1],
-      captions: ["Dan", "Suzette"], 
+      captions: ["Dan", "Suzette"],
       default: 0,
-    },    
+    },
    ];
 }
 
@@ -112,7 +40,7 @@ function catmullRom(v1, v2, v3, v4, u) {
 
     // Coefficients for Matrix M
     // these should all be const, but MSIE doens't handle that
-    var M11	= 0.0;	
+    var M11	= 0.0;
     var M12	= 1.0;
     var M13	= 0.0;
     var M14	= 0.0;
@@ -128,26 +56,26 @@ function catmullRom(v1, v2, v3, v4, u) {
     var M42	= 1.5;
     var M43	=-1.5;
     var M44	= 0.5;
-    
+
     c1x =  	         M12*v2.x;
     c2x = M21*v1.x            + M23*v3.x;
     c3x = M31*v1.x + M32*v2.x + M33*v3.x + M34*v4.x;
     c4x = M41*v1.x + M42*v2.x + M43*v3.x + M44*v4.x;
-    
+
     c1y =  	         M12*v2.y;
     c2y = M21*v1.y            + M23*v3.y;
     c3y = M31*v1.y + M32*v2.y + M33*v3.y + M34*v4.y;
     c4y = M41*v1.y + M42*v2.y + M43*v3.y + M44*v4.y;
-    
+
     c1z =  	         M12*v2.z;
     c2z = M21*v1.z            + M23*v3.z;
     c3z = M31*v1.z + M32*v2.z + M33*v3.z + M34*v4.z;
     c4z = M41*v1.z + M42*v2.z + M43*v3.z + M44*v4.z;
-    
+
     resX = (((c4x*u + c3x)*u +c2x)*u + c1x);
     resY = (((c4y*u + c3y)*u +c2y)*u + c1y);
     resZ = (((c4z*u + c3z)*u +c2z)*u + c1z);
-    
+
     return new CSG.Vector3D(resX, resY, resZ);
 }
 
@@ -163,7 +91,7 @@ function catmullRomWithTangent(v1, v2, v3, v4, u) {
 	var res1 = catmullRom(v1, v2, v3, v4, u-tiny) ;
 	var res2 = catmullRom(v1, v2, v3, v4, u) ;
 	var tangent = res2.minus(res1).unit();
-	return [res2, tangent];	
+	return [res2, tangent];
     }
 }
 
@@ -174,7 +102,7 @@ function catmullRomWithTangent(v1, v2, v3, v4, u) {
 // the CAG are perpendicular to 'up' and the spline tangent
 
 
-function splineExtrude(vCP, numInterps, up, 
+function splineExtrude(vCP, numInterps, up,
 		       cag, transform) {
     var polygons = [];
     var splinePointsAndTangents = [];
@@ -182,7 +110,7 @@ function splineExtrude(vCP, numInterps, up,
 
     // corners [j] corresponds to the array of all points on the
     // spline with the offset of cag.sides[j].vertex0
-    
+
     // corners[j][i] is the i'th interpolated point on the master
     // spline, plus the offset of cag.sides[j].vertex0
 
@@ -196,7 +124,7 @@ function splineExtrude(vCP, numInterps, up,
     if (typeof(transform) != 'function') {
 	transform = function(e) { return e; };
     }
-    
+
     // fencepost - do the zeroth point of the zeroth segment
     splinePointsAndTangents.push(catmullRomWithTangent(vCP[0],vCP[0+1],
 						       vCP[0+2],vCP[0+3],0));
@@ -209,7 +137,7 @@ function splineExtrude(vCP, numInterps, up,
 							       vCP[j+2],vCP[j+3],u));
 	}
     }
-    
+
 
     for (var i=0; i < splinePointsAndTangents.length; i++) {
 	var sideways = up.cross(splinePointsAndTangents[i][1]);
@@ -217,18 +145,18 @@ function splineExtrude(vCP, numInterps, up,
 	    corners[j].push(transform(splinePointsAndTangents[i][0]
 				      .plus(sideways.times(cag.sides[j].vertex0.pos.x))
 				      .plus(up.times(cag.sides[j].vertex0.pos.y))));
-	    
+
 	    // vertex1 should be the same as vertex0 of the next side,
 	    // so I don't need to handle it here
 	}
     }
     var shared = CSG.Polygon.defaultShared;
-    
+
     var start = 0;
     var end = corners[0].length-1;
     var nCorners = corners[0].length
 
-    
+
 
     //start cap
     var startCap = [];
@@ -240,13 +168,13 @@ function splineExtrude(vCP, numInterps, up,
 //    polygons.push(CSG.Polygon.createFromPoints([corners4[start],corners3[start],
 //						corners2[start],corners1[start]],
 //					       shared));
-    for (var i = start; i < end; i++) { 
+    for (var i = start; i < end; i++) {
 
 	// This is done as triangles, (rather than rectangles) because
 	// at points on the spline with high curvature, the inside
 	// corners can become twisted, which messes up the
 	// renderer. What I don't know is what happens when such a
-	// file is converted to STL and sent to a 3D printer.  
+	// file is converted to STL and sent to a 3D printer.
 
 	// In the words of Shapeways, it makes the printer cry.
 
@@ -270,7 +198,7 @@ function splineExtrude(vCP, numInterps, up,
 }
 
 
-var controlPoints = 
+var controlPoints =
     [
 	[0,     0,  1, 1],   //over across the middle
 	[10,  10, -1, 0],  //under the first cross
@@ -279,7 +207,7 @@ var controlPoints =
 	[39,  27.25,  0, 1],   // the sharp corner
 //	[32,  12,  0, 0],
 	[30,  10, -1, 0],
-//	[28,  8,   0, 0],  
+//	[28,  8,   0, 0],
 	[20,  3.75,   0, 0],  // bottom of loop under the corner
 	[10,  10,  1, 1],
 	[4,   20,  0, 0], // grand curve near the sharp corner (under the long arc)
@@ -290,7 +218,7 @@ var controlPoints =
 //	[30,  35,  0, 0], // top of the long arc
 	[40,  34,  0, 0],
 	[50,  30,  1, 1], // about where the long arc crosses over
-//	[58,  22,  0, 0], 
+//	[58,  22,  0, 0],
 	[60,  20, -1, 0],
 	[70,  10,  1, 1],
 	[75,  5,  0, 0],
@@ -312,14 +240,14 @@ function main (params) {
     var up = new CSG.Vector3D(0,0,1);
     var flipCP = controlPoints.slice();
     flipCP.reverse();
-    flipCP = flipCP.map(function(elt) { return ([elt[0]*-1, elt[1]*-1, 
+    flipCP = flipCP.map(function(elt) { return ([elt[0]*-1, elt[1]*-1,
 						 elt[2],    elt[3]]); });
     // delete the repeated 0,0 point;
     controlPoints.shift();
     controlPoints = flipCP.concat(controlPoints);
     if (!his) {
-	controlPoints = controlPoints.map(function(elt) { 
-	    return ([elt[0], elt[1]*-1, 
+	controlPoints = controlPoints.map(function(elt) {
+	    return ([elt[0], elt[1]*-1,
 		     elt[2]*-1,    elt[3]]); });
     }
     var splines = [];
@@ -329,7 +257,7 @@ function main (params) {
     for (var i=-1; i<numberOfPatterns+1; i++) {
 //    for (var i=-1; i<4+1; i++) {
 	tripleCP = tripleCP.concat(controlPoints.map(
-	    function(elt) { return ([elt[0]+(i*160), elt[1], 
+	    function(elt) { return ([elt[0]+(i*160), elt[1],
 				     elt[2], elt[3]]); }));
 	// delete final point so it's not duplicated
 	lastPoint = tripleCP.pop();
@@ -337,7 +265,7 @@ function main (params) {
     // put final point back after the last spline
     tripleCP.push(lastPoint);
 
-    // delete all but last two points of the extra cycle 
+    // delete all but last two points of the extra cycle
     // ie. the start/end point and the extra control point
     for (var i=0; i < controlPoints.length-2; i++) {
 	tripleCP.pop();
@@ -346,12 +274,12 @@ function main (params) {
 
     debugprint(tripleCP);
     var vCP = tripleCP.map(function(e) {
-	return new CSG.Vector3D(e[0],e[1],e[2]); 
+	return new CSG.Vector3D(e[0],e[1],e[2]);
     });
 
-    var shape1 = CAG.fromPoints([[-4,0], 
-				 [-4,5.0], [-1.5,8.5],  
-				 [1.55,8.5], [4, 5.0], 
+    var shape1 = CAG.fromPoints([[-4,0],
+				 [-4,5.0], [-1.5,8.5],
+				 [1.55,8.5], [4, 5.0],
 				 [4,0]]);
 
     //	var shape1 = CAG.fromPoints([[-2.75,0], [0,2.75], [2.75,0]]);
@@ -363,13 +291,13 @@ function main (params) {
     }
 
     csg = csg.transform(CSG.Matrix4x4.rotationX(90));
-    csg = csg.scale(targetCircumference/circumference);    
+    csg = csg.scale(targetCircumference/circumference);
     return csg;
 
 // 7.5 ring size is 17.7 mm diameter 55.7mm circumference
 // my guess as to my own ring size is 54mm
 
-// augh! the pass-under bits are 1 pre-scaled unit narrower 
+// augh! the pass-under bits are 1 pre-scaled unit narrower
 // (after scaling, about 1/8 mm, so .4 mm in extra circumference.
 }
 
@@ -386,12 +314,5 @@ function transformVec3DtoRingSpace (vec) {
 // being transformed into ring space, are 4 coplanar vertices still
 // always coplanar?  I'm pretty sure the answer is 'No'.  Does this matter?
 // I think yes.  So I can generate triangles instead, easily enough.
-// Excpet the end caps... which for my model are not actually rotated, 
+// Excpet the end caps... which for my model are not actually rotated,
 // because they are at the origin or exactly 11 loops away.
-
-
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>

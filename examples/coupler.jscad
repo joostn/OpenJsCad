@@ -1,85 +1,17 @@
-<!DOCTYPE html>
-
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: Parametric axis coupler</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: Parametric axis coupler</h1>
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code">
 var cylresolution=16;
 
-// Here we define the user editable parameters: 
+// Here we define the user editable parameters:
 function getParameterDefinitions() {
   return [
     {
-      name: 'quality', 
+      name: 'quality',
       type: 'choice',
       caption: 'Quality',
       values: [0, 1],
-      captions: ["Draft","High"], 
+      captions: ["Draft","High"],
       default: 0,
-    },    
-  
+    },
+
     { name: 'diameter1', caption: 'Axis diameter of first coupler:', type: 'float', default: 12.2 },
     { name: 'shaftlength1', caption: 'Axis depth of first coupler:', type: 'float', default: 15 },
     { name: 'outerlength1', caption: 'Outer length of first coupler:', type: 'float', default: 20 },
@@ -96,33 +28,33 @@ function getParameterDefinitions() {
     { name: 'spiderlength', caption: 'Spider thickness:', type: 'float', default: 12 },
     { name: 'spidermargin', caption: 'Spider tolerance:', type: 'float', default: 0 },
     { name: 'numteeth', caption: 'Num teeth per coupler:', type: 'int', default: 2},
-    
+
   ];
 }
 
 function main(params)
 {
   cylresolution=(params.quality == "1")? 64:16;
- 
+
   var outerdiameter=params.outerdiameter;
   outerdiameter=Math.max(outerdiameter, params.diameter1+0.5);
   outerdiameter=Math.max(outerdiameter, params.diameter2+0.5);
 
   var spidercenterdiameter=outerdiameter/2;
-  
-  var part1=makeShaft(params.diameter1, outerdiameter,spidercenterdiameter,params.shaftlength1,params.outerlength1,params.spiderlength, params.nutradius1, params.nutthickness1, params.screwdiameter1, params.numteeth);  
+
+  var part1=makeShaft(params.diameter1, outerdiameter,spidercenterdiameter,params.shaftlength1,params.outerlength1,params.spiderlength, params.nutradius1, params.nutthickness1, params.screwdiameter1, params.numteeth);
   var part2=makeShaft(params.diameter2, outerdiameter,spidercenterdiameter,params.shaftlength2,params.outerlength2,params.spiderlength, params.nutradius2, params.nutthickness2, params.screwdiameter2, params.numteeth);
   var spider=makeSpider(outerdiameter, spidercenterdiameter, params.spiderlength, params.numteeth);
-  
+
   if(params.spidermargin > 0)
   {
     spider=spider.contract(params.spidermargin, 4);
   }
-  
+
   // rotate shaft parts for better 3d printing:
   part1=part1.rotateX(180).translate([0,0,params.outerlength1+params.spiderlength]);
   part2=part2.rotateX(180).translate([0,0,params.outerlength2+params.spiderlength]);
-  
+
   var result=part1.translate([-outerdiameter-5,0,0]);
   result=result.union(part2.translate([0,0,0]));
   result=result.union(spider.translate([outerdiameter+5,0,-params.spidermargin]));
@@ -132,11 +64,11 @@ function main(params)
 function makeShaft(innerdiameter, outerdiameter, spidercenterdiameter, shaftlength, outerlength, spiderlength, nutradius, nutthickness, screwdiameter, numteeth)
 {
   var result=CSG.cylinder({start:[0,0,0], end:[0,0,outerlength], radius:outerdiameter/2, resolution:cylresolution});
-  
+
   for(var i=0; i < numteeth; i++)
   {
     var angle=i*360/numteeth;
-    var pie=makePie(outerdiameter/2, spiderlength,angle-45/numteeth, angle+45/numteeth); 
+    var pie=makePie(outerdiameter/2, spiderlength,angle-45/numteeth, angle+45/numteeth);
     pie=pie.translate([0,0,outerlength]);
     result=result.union(pie);
   }
@@ -144,9 +76,9 @@ function makeShaft(innerdiameter, outerdiameter, spidercenterdiameter, shaftleng
   result=result.subtract(spidercylinder);
   var shaftcylinder=CSG.cylinder({start:[0,0,0], end:[0,0,shaftlength], radius:innerdiameter/2, resolution:cylresolution});
   result=result.subtract(shaftcylinder);
-  
+
   var screwz=shaftlength/2;
-  if(screwz < nutradius) screwz=nutradius;  
+  if(screwz < nutradius) screwz=nutradius;
   var nutcutout = hexagon(nutradius, nutthickness).translate([0,0,-nutthickness/2]);
   var grubnutradiusAtFlatSide = nutradius * Math.cos(Math.PI / 180 * 30);
   var nutcutoutrectangle = CSG.cube({
@@ -157,18 +89,18 @@ function makeShaft(innerdiameter, outerdiameter, spidercenterdiameter, shaftleng
   nutcutout = nutcutout.rotateY(90);
   nutcutout = nutcutout.translate([(outerdiameter+innerdiameter)/4, 0, screwz]);
   result = result.subtract(nutcutout);
-  
+
   var screwcutout=CSG.cylinder({
     start: [outerdiameter/2, 0, screwz],
     end: [0, 0, screwz],
-    radius: screwdiameter/2, 
+    radius: screwdiameter/2,
     resolution:cylresolution
   });
   result=result.subtract(screwcutout);
-  
-//return nutcutout; 
+
+//return nutcutout;
 //  nutcutout = nutcutout.translate([-grubnutheight/2 - centerholeradius - nutdistance,0,0]);
-  
+
   return result;
 }
 
@@ -186,14 +118,14 @@ function makePie(radius, height, startangle, endangle)
   {
     var angle=startangle+i/numsteps*(endangle-startangle);
     var vec = CSG.Vector2D.fromAngleDegrees(angle).times(radius);
-    points.push(vec);    
+    points.push(vec);
   }
   points.push(new CSG.Vector2D(0,0));
   var shape2d=new CSG.Polygon2D(points);
   var extruded=shape2d.extrude({
     offset: [0,0,height],   // direction for extrusion
   });
-  return extruded;  
+  return extruded;
 }
 
 function hexagon(radius, height)
@@ -216,7 +148,7 @@ function makeSpider(outerdiameter, spidercenterdiameter, spiderlength, numteeth)
   for(var i=0; i < numspiderteeth; i++)
   {
     var angle=i*360/numspiderteeth;
-    var pie=makePie(outerdiameter/2, spiderlength,angle-90/numspiderteeth, angle+90/numspiderteeth); 
+    var pie=makePie(outerdiameter/2, spiderlength,angle-90/numspiderteeth, angle+90/numspiderteeth);
     pie=pie.translate([0,0,0]);
     result=result.union(pie);
   }
@@ -226,8 +158,3 @@ function makeSpider(outerdiameter, spidercenterdiameter, spiderlength, numteeth)
 
   return result;
 }
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>
