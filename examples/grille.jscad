@@ -1,72 +1,4 @@
-<!DOCTYPE html>
-
-<html><head>
-  <script src="lightgl.js"></script>
-  <script src="csg.js"></script>
-  <script src="openjscad.js"></script>
-  <style>
-
-body {
-  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-pre, code, textarea {
-  font: 12px/20px Monaco, monospace;
-  border: 1px solid #CCC;
-  border-radius: 3px;
-  background: #F9F9F9;
-  padding: 0 3px;
-  color: #555;
-}
-pre, textarea {
-  padding: 10px;
-  width: 100%;
-}
-textarea {
-  height: 200px;
-}
-textarea:focus {
-  outline: none;
-}
-
-canvas { cursor: move; }
-
-  </style>
-<link rel="stylesheet" href="openjscad.css" type="text/css">
-
-<script>
-
-var gProcessor=null;
-
-// Show all exceptions to the user:
-OpenJsCad.AlertUserOfUncaughtExceptions();
-
-function onload()
-{
-  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-  updateSolid();
-}
-
-function updateSolid()
-{
-  gProcessor.setJsCad(document.getElementById('code').value);
-}
-</script>
-<title>OpenJsCad demo: Parametric Grille</title>  
-</head>
-<body onload="onload()">
-  <h1>OpenJsCad demo: Parametric Grille</h1>
-<div id="viewer"></div>
-  <h2>Source code</h2>
-Below is the OpenJsCad script for this demo. To build your own models, create a .jscad script
-and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>. For more information see the
-<a href="index.html">OpenJsCad documentation</a>. 
-<br><br> 
-<textarea id="code" style="height: 500px">
-// Here we define the user editable parameters: 
+// Here we define the user editable parameters:
 function getParameterDefinitions() {
   return [
     { name: 'outerwidth', caption: 'Outer width of grille:', type: 'float', default: 190 },
@@ -77,37 +9,37 @@ function getParameterDefinitions() {
     { name: 'bladescale', caption: 'Relative size of blades (1.0 is default):', type: 'float', default: 1 },
     { name: 'numdividers', caption: 'Number of vertical dividers:', type: 'int', default: 2 },
     {
-      name: 'addlooseners', 
+      name: 'addlooseners',
       type: 'choice',
       caption: 'Add loops (for easy removal):',
       values: [0, 1],
-      captions: ["No", "Yes"], 
+      captions: ["No", "Yes"],
       default: 1,
-    },    
+    },
     {
-      name: 'show', 
+      name: 'show',
       type: 'choice',
       caption: 'Show:',
       values: ["all", "grille", "holders"],
-      captions: ["All", "Grille (for printing)", "Holders (for printing)"], 
+      captions: ["All", "Grille (for printing)", "Holders (for printing)"],
       default: "all",
-    },    
+    },
     {
-      name: 'mouseears', 
+      name: 'mouseears',
       type: 'choice',
       caption: 'Add mouse ears:',
       values: [0, 1],
-      captions: ["No", "Yes"], 
+      captions: ["No", "Yes"],
       default: 1,
-    },    
+    },
     {
-      name: 'quality', 
+      name: 'quality',
       type: 'choice',
       caption: 'Quality:',
       values: [0, 1],
-      captions: ["Draft", "Final"], 
+      captions: ["Draft", "Final"],
       default: 0,
-    },    
+    },
   ];
 }
 
@@ -117,11 +49,11 @@ function main(params)
   var outerheight = params.outerheight;
   var thickness = params.thickness;
   var outerdepth = params.outerdepth;
-  var innerdistance = params.innerdistance;  
+  var innerdistance = params.innerdistance;
   var bladescale = params.bladescale;
-  
+
   var draft = params.quality == 0;
-  
+
   var marginleftright = 21;
   var margintopbottom = 15;
   var bladedistance = 12 * bladescale;
@@ -129,20 +61,20 @@ function main(params)
   frontroundradius = Math.max(frontroundradius, thickness+0.2);
   var outerroundradius = 3;
   outerroundradius = Math.max(outerroundradius, thickness+0.2);
-  outerdepth = Math.max(outerdepth, outerroundradius); 
-  outerdepth = Math.max(outerdepth, innerdistance+thickness); 
+  outerdepth = Math.max(outerdepth, outerroundradius);
+  outerdepth = Math.max(outerdepth, innerdistance+thickness);
   var frontextend = innerdistance + bladescale*12 + thickness - outerdepth;
-  frontextend = Math.max(frontextend, 1.5);  
+  frontextend = Math.max(frontextend, 1.5);
   var bladewidth = outerwidth - 2*marginleftright;
   var bladesheight = outerheight - 2*margintopbottom;
-  var numblades = Math.ceil(bladesheight / bladedistance) + 1; 
+  var numblades = Math.ceil(bladesheight / bladedistance) + 1;
   var topnotchsize = new CSG.Vector3D([20, 8, 3]);
   var topnotchpos = new CSG.Vector3D([outerwidth/2-thickness - topnotchsize.x/2, outerheight/2-thickness - topnotchsize.y/2, topnotchsize.z/2]);
   var bottomnotchsize = new CSG.Vector3D([12, 4, topnotchsize.z]);
   var bottomnotchpos = new CSG.Vector3D([outerwidth/2-thickness - 4 - bottomnotchsize.x/2, -outerheight/2+thickness + bottomnotchsize.y/2, bottomnotchsize.z/2]);
 
   var roundresolution = draft? 4 : 16;
-  
+
   var result = new CSG();
   if(params.show != "holders")
   {
@@ -165,7 +97,7 @@ function main(params)
     shell = shell.subtract(frontextendinnershell);
     var frontextendshell = frontextendoutershell.subtract(frontextendinnershell);
     shell = shell.union(frontextendshell);
-    
+
     // build a blade:
     var curvedpath = CSG.Path2D.arc({
       center: [0,0,0],
@@ -180,7 +112,7 @@ function main(params)
     blade = blade.rotateY(-90);
     blade = blade.translate([0, 0, -blade.getBounds()[0].z+innerdistance]);
     var bladesize = blade.getBounds()[1].minus(blade.getBounds()[0]);
-    
+
     // add the blades to the shell:
     var blades = new CSG();
     for(var i = 0; i < numblades; i++)
@@ -192,12 +124,12 @@ function main(params)
     blades = blades.intersect(frontextendinnershell);
     var grille = shell;
     grille = shell.union(blades);
-    
+
     // add the dividers:
     var dividers = new CSG();
     if(params.numdividers > 0)
     {
-      var w1 = (bladewidth - params.numdividers * thickness)/(params.numdividers+1); 
+      var w1 = (bladewidth - params.numdividers * thickness)/(params.numdividers+1);
       for(var i = 0; i < params.numdividers; i++)
       {
         var x = -(params.numdividers-1)*(w1+thickness)/2 + i*(w1+thickness);
@@ -207,21 +139,21 @@ function main(params)
       }
     }
     grille = grille.union(dividers);
-    
+
     // create the notches:
     var notches = new CSG();
     var topnotch1 = CSG.cube({center: topnotchpos, radius: topnotchsize.times(0.5) });
-    notches = notches.union(topnotch1);  
+    notches = notches.union(topnotch1);
     var topnotch2 = CSG.cube({center: [-topnotchpos.x, topnotchpos.y, topnotchpos.z], radius: topnotchsize.times(0.5) });
     notches = notches.union(topnotch2);
     var bottomnotch1 = CSG.cube({center: bottomnotchpos, radius: bottomnotchsize.times(0.5) });
-    notches = notches.union(bottomnotch1);  
+    notches = notches.union(bottomnotch1);
     var bottomnotch2 = CSG.cube({center: [-bottomnotchpos.x, bottomnotchpos.y, bottomnotchpos.z], radius: bottomnotchsize.times(0.5) });
-    notches = notches.union(bottomnotch2);  
-    notches = notches.intersect(outershell);    
+    notches = notches.union(bottomnotch2);
+    notches = notches.intersect(outershell);
     grille = grille.union(notches);
     result = result.union(grille);
-    
+
     // create the looseners:
     if(params.addlooseners != 0)
     {
@@ -232,12 +164,12 @@ function main(params)
         radius: [loosenerinnerwidth/2+thickness, loosenerinnerheight/2+thickness, loosenerdepth/2]});
       loosener = loosener.subtract(CSG.cube({center: [0, -outerheight/2 - loosenerinnerheight/2, loosenerdepth/2],
         radius: [loosenerinnerwidth/2, loosenerinnerheight/2, loosenerdepth/2]}));
-      var loosenerx = -outerwidth/2 + loosenerinnerwidth/2 + 5 + thickness; 
-  
+      var loosenerx = -outerwidth/2 + loosenerinnerwidth/2 + 5 + thickness;
+
       var looseners = loosener.translate([loosenerx, 0, 0]);
       looseners = looseners.union(loosener.translate([-loosenerx, 0, 0]));
       result = result.union(looseners);
-    } 
+    }
 
     if(params.mouseears != 0)
     {
@@ -262,7 +194,7 @@ function main(params)
       }
     }
   }
-  
+
   if(params.show != "grille")
   {
     // create the holders:
@@ -274,7 +206,7 @@ function main(params)
     var holderbottomclipheight = 2;
     var holderscrewholeradius = 2;
     var holderscrewholedistance = 6;
-    
+
     var holderx;
     if(params.show == "holders")
     {
@@ -287,12 +219,12 @@ function main(params)
     }
     var holdery1 = topnotchpos.y - topnotchsize.y/2 - holderyoffset;
     var holdery2 = bottomnotchpos.y + bottomnotchsize.y/2 + holderyoffset;
-    
+
     var holdery0 = holdery1+holdertopclipheight;
     var holdery3 = holdery2-holderbottomclipheight;
-    var holder = CSG.cube({center: [0, (holdery1 + holdery2)/2 , holderthickness/2], 
+    var holder = CSG.cube({center: [0, (holdery1 + holdery2)/2 , holderthickness/2],
       radius: [holderwidth/2, (holdery1-holdery2)/2, holderthickness/2]});
-    var d1 = 7;  
+    var d1 = 7;
     var holdery1a = holdery1 - d1;
     var holdery2a = holdery2 + d1;
     var holderz1 = topnotchsize.z + holderzoffset;
@@ -316,23 +248,18 @@ function main(params)
     var screwhole = CSG.cylinder({start: [0,0,0], end: [0, 0, holderthickness], radius: holderscrewholeradius, resolution: 16});
     holder = holder.subtract(screwhole.translate([0, holdery1a-holderscrewholedistance, 0]));
     holder = holder.subtract(screwhole.translate([0, holdery2a+holderscrewholedistance, 0]));
-    
+
     holder = holder.setColor(0, 1, 0);
-    
+
     var holders = holder.translate([holderx,0,0]);
     holders = holders.union(holder.translate([-holderx,0,0]));
     if(params.show == "holders")
     {
       holders = holders.rotateZ(90);
     }
-    
+
     result = result.union(holders);
   }
   result = result.rotateZ(90);
   return result;
 }
-</textarea><br>
-<input type="submit" value="Update" onclick="updateSolid(); return false;">
-<br><br>
-</body>
-</html>
