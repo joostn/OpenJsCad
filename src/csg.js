@@ -16,7 +16,7 @@ http://evanw.github.com/csg.js/
 
 CSG operations through BSP trees suffer from one problem: heavy fragmentation
 of polygons. If two CSG solids of n polygons are unified, the resulting solid may have
-in the order of n*n is doing polygons, because each polygon is split by the planes of all other
+in the order of n*n polygons, because each polygon is split by the planes of all other
 polygons. After a few operations the number of polygons explodes.
 
 This version of CSG.js solves the problem in 3 ways:
