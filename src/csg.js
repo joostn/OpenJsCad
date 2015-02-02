@@ -3507,7 +3507,10 @@ for solid CAD anyway.
                 node = args.node;
                 polygontreenodes = args.polygontreenodes;
 
-                if(polygontreenodes.length === 0) continue;
+                if (polygontreenodes.length === 0) {
+                    args = stack.pop();
+                    continue;
+                }
                 var _this = node;
                 if(!node.plane) {
                     var bestplane = polygontreenodes[0].getPolygon().plane;
