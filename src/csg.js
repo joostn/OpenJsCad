@@ -3515,7 +3515,7 @@ for solid CAD anyway.
                     continue;
                 }
                 var _this = node;
-                if(!node.plane) {
+                if (!node.plane) {
                     var bestplane = polygontreenodes[0].getPolygon().plane;
                     node.plane = bestplane;
                 }
@@ -3527,11 +3527,11 @@ for solid CAD anyway.
                 }
 
                 if (frontnodes.length > 0) {
-                    if(!node.front) node.front = new CSG.Node(node);
+                    if (!node.front) node.front = new CSG.Node(node);
                     stack.push({'node': node.front, 'polygontreenodes': frontnodes});
                 }
                 if (backnodes.length > 0) {
-                    if(!node.back) node.back = new CSG.Node(node);
+                    if (!node.back) node.back = new CSG.Node(node);
                     stack.push({'node': node.back, 'polygontreenodes': backnodes});
                 }
 
