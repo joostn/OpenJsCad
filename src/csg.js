@@ -3349,12 +3349,15 @@ for solid CAD anyway.
         },
 
         invertSub: function() {
-            var node = this, stack = [];
+            var node = this, stack = [], children;
             do {
                 if (node.polygon) {
                     node.polygon = node.polygon.flipped();
                 }
-                stack = stack.concat(node.children);
+                children = node.children;
+                for (var i = 0, l = children.length; i < l; i++) {
+                    stack.push(children[i]);
+                }
 
                 node = stack.pop();
             } while(typeof(node) !== 'undefined');
