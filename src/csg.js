@@ -3434,17 +3434,17 @@ for solid CAD anyway.
     CSG.Node.prototype = {
         // Convert solid space to empty space and empty space to solid space.
         invert: function() {
-            var node = this, stack = [];
-            do {
+            var queue = [this];
+            var i, node;
+            for (var i = 0; i < queue.length; i++) {
+                node = queue[i];
                 if(node.plane) node.plane = node.plane.flipped();
-                if(node.front) stack.push(node.front);
-                if(node.back) stack.push(node.back);
+                if(node.front) queue.push(node.front);
+                if(node.back) queue.push(node.back);
                 var temp = node.front;
                 node.front = node.back;
                 node.back = temp;
-
-                node = stack.pop();
-            } while(typeof(node) !== 'undefined');
+            }
         },
 
         // clip polygontreenodes to our plane
