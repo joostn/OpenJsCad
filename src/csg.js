@@ -3349,18 +3349,19 @@ for solid CAD anyway.
         },
 
         invertSub: function() {
-            var node = this, stack = [], children;
-            do {
-                if (node.polygon) {
-                    node.polygon = node.polygon.flipped();
+            var children = [this];
+            var queue = [children];
+            var i, j, l, node;
+            for (i = 0; i < queue.length; i++) {
+                children = queue[i];
+                for (j = 0, l = children.length; j < l; j++) {
+                    node = children[j];
+                    if (node.polygon) {
+                        node.polygon = node.polygon.flipped();
+                    }
+                    queue.push(node.children);
                 }
-                children = node.children;
-                for (var i = 0, l = children.length; i < l; i++) {
-                    stack.push(children[i]);
-                }
-
-                node = stack.pop();
-            } while(typeof(node) !== 'undefined');
+            }
         },
 
         recursivelyInvalidatePolygon: function() {
