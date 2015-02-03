@@ -3247,22 +3247,22 @@ for solid CAD anyway.
         },
 
         getPolygons: function(result) {
-            var node = this, stack = [];
-
-            do {
-                if (node.polygon) {
-                    // the polygon hasn't been broken yet. We can ignore the children and return our polygon:
-                    result.push(node.polygon);
-                } else {
-                    // our polygon has been split up and broken, so gather all subpolygons from the children
-                    var children = node.children;
-                    for (var i = 0, l = children.length; i < l; ++i) {
-                        stack.push(children[i]);
+            var children = [this];
+            var queue = [children];
+            var i, j, l, node;
+            for (i = 0; i < queue.length; ++i ) { // queue size can change in loop, don't cache length
+                children = queue[i];
+                for (j = 0, l = children.length; j < l; j++) { // ok to cache length
+                    node = children[j];
+                    if (node.polygon) {
+                        // the polygon hasn't been broken yet. We can ignore the children and return our polygon:
+                        result.push(node.polygon);
+                    } else {
+                        // our polygon has been split up and broken, so gather all subpolygons from the children
+                        queue.push(node.children);
                     }
                 }
-
-                node = stack.pop();
-            } while(typeof(node) !== 'undefined');
+            }
         },
 
         // split the node by a plane; add the resulting nodes to the frontnodes and backnodes array
