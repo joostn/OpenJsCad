@@ -634,7 +634,7 @@ OpenJsCad.Processor = function(containerdiv, options, onchange) {
   this.onchange = onchange;
 
   // Draw black triangle lines ("wireframe")
-  this.options.drawLines = (options && options.drawLines) || false;
+  this.options.drawLines = (options && options.drawLines) || false;
   // Draw surfaces
   this.options.drawFaces = (options && options.drawFaces) || true;
 
@@ -1050,9 +1050,10 @@ OpenJsCad.Processor.prototype = {
     var paramValues = this.getParamValues();
     var useSync = this.debugging;
     var options = {};
+    var startTime = Date.now();
 
-    if(!useSync)
-    {
+      if(!useSync)
+      {
       this.worker = OpenJsCad.parseJsCadScriptASync(this.script, paramValues, this.options, function(err, obj) {
         that.processing = false;
         that.worker = null;
@@ -1064,7 +1065,9 @@ OpenJsCad.Processor.prototype = {
         else
         {
           that.setRenderedObjects(obj);
-          that.statusspan.innerHTML = "Ready.";
+          var currentTime = Date.now();
+          var elapsed = (currentTime - startTime);
+          that.statusspan.innerHTML = "Ready.  Rendered in " + elapsed + "ms";
         }
         that.enableItems();
         if(that.onchange) that.onchange();
