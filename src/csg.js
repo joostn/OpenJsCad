@@ -3270,68 +3270,75 @@ for solid CAD anyway.
         // If the plane does intersect the polygon, two new child nodes are created for the front and back fragments,
         //  and added to both arrays.
         splitByPlane: function(plane, coplanarfrontnodes, coplanarbacknodes, frontnodes, backnodes) {
-            var node = this, stack = [];
-
-            do {
-                var children = node.children;
-                if (children.length) {
-                    for (var i = 0, l = children.length; i < l; i++) {
-                        stack.push(children[i]);
-                    }
-                } else {
-                    // no children. Split the polygon:
-                    var polygon = node.polygon;
-                    if (polygon) {
-                        var bound = polygon.boundingSphere();
-                        var sphereradius = bound[1] + 1e-4;
-                        var planenormal = plane.normal;
-                        var spherecenter = bound[0];
-                        var d = planenormal.dot(spherecenter) - plane.w;
-                        if (d > sphereradius) {
-                            frontnodes.push(node);
-                        } else if (d < -sphereradius) {
-                            backnodes.push(node);
+            if (this.children.length) {
+                var queue = [this.children], i, j, l, node, nodes;
+                for (i = 0; i < queue.length; i++) { // queue.length can increase, do not cache
+                    nodes = queue[i];
+                    for (j = 0, l = nodes.length; j < l; j++) { // ok to cache length
+                        node = nodes[j];
+                        if (node.children.length) {
+                            queue.push(node.children);
                         } else {
-                            var splitresult = plane.splitPolygon(polygon);
-                            switch (splitresult.type) {
-                                case 0:
-                                    // coplanar front:
-                                    coplanarfrontnodes.push(node);
-                                    break;
-
-                                case 1:
-                                    // coplanar back:
-                                    coplanarbacknodes.push(node);
-                                    break;
-
-                                case 2:
-                                    // front:
-                                    frontnodes.push(node);
-                                    break;
-
-                                case 3:
-                                    // back:
-                                    backnodes.push(node);
-                                    break;
-
-                                case 4:
-                                    // spanning:
-                                    if (splitresult.front) {
-                                        var frontnode = node.addChild(splitresult.front);
-                                        frontnodes.push(frontnode);
-                                    }
-                                    if (splitresult.back) {
-                                        var backnode = node.addChild(splitresult.back);
-                                        backnodes.push(backnode);
-                                    }
-                                    break;
-                            }
+                            // no children. Split the polygon:
+                            node._splitByPlane(plane, coplanarfrontnodes, coplanarbacknodes, frontnodes, backnodes);
                         }
                     }
                 }
-                node = stack.pop();
-            } while (typeof(node) !== 'undefined');
+            } else {
+                this._splitByPlane(plane, coplanarfrontnodes, coplanarbacknodes, frontnodes, backnodes);
+            }
+        },
 
+        // only to be called for nodes with no children
+        _splitByPlane: function (plane, coplanarfrontnodes, coplanarbacknodes, frontnodes, backnodes) {
+            var polygon = this.polygon;
+            if (polygon) {
+                var bound = polygon.boundingSphere();
+                var sphereradius = bound[1] + 1e-4;
+                var planenormal = plane.normal;
+                var spherecenter = bound[0];
+                var d = planenormal.dot(spherecenter) - plane.w;
+                if (d > sphereradius) {
+                    frontnodes.push(this);
+                } else if (d < -sphereradius) {
+                    backnodes.push(this);
+                } else {
+                    var splitresult = plane.splitPolygon(polygon);
+                    switch (splitresult.type) {
+                        case 0:
+                            // coplanar front:
+                            coplanarfrontnodes.push(this);
+                            break;
+
+                        case 1:
+                            // coplanar back:
+                            coplanarbacknodes.push(this);
+                            break;
+
+                        case 2:
+                            // front:
+                            frontnodes.push(this);
+                            break;
+
+                        case 3:
+                            // back:
+                            backnodes.push(this);
+                            break;
+
+                        case 4:
+                            // spanning:
+                            if (splitresult.front) {
+                                var frontnode = this.addChild(splitresult.front);
+                                frontnodes.push(frontnode);
+                            }
+                            if (splitresult.back) {
+                                var backnode = this.addChild(splitresult.back);
+                                backnodes.push(backnode);
+                            }
+                            break;
+                    }
+                }
+            }
         },
 
 
