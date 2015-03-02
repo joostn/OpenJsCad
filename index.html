@@ -417,6 +417,17 @@ var plane = CSG.Plane.fromPoints([5,0,0], [5, 1, 0], [3, 1, 7]);
 var cube5 = cube.mirrored(plane);
 </pre>
 
+<h2>Centering</h2>
+Solids can be centered
+<pre>
+var cube = CSG.cube().translate([1, 2, 3]);
+
+var cubeC = cube.center();
+// only center on selected axes
+var cubeCx = cube.center('x');
+var cubeCxz = cube.center('x', 'z');
+</pre>
+
 <h2>Cutting by a plane</h2>
 A solid can be cut by a plane; only the part on the back side is kept:
 
@@ -678,6 +689,7 @@ shape1 = shape1.expand(1, 20);
 var shape = shape1.union([shape2, shape3, shape4]);
 
 // Do some transformations:
+shape.center();
 shape=shape.translate([-2, -2]);
 shape=shape.rotateZ(20);
 shape=shape.scale([0.7, 0.9]);
