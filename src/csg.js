@@ -5058,6 +5058,126 @@ for solid CAD anyway.
         }
     };
 
+    CSG.ConnectorList = function(connectors) {
+        this.connectors_ = connectors ? connectors.slice() : [];
+    };
+
+    CSG.ConnectorList.fromPath2D = function(path2D, arg1, arg2) {
+        if (arguments.length === 3) {
+            return CSG.ConnectorList._fromPath2DTangents(path2D, arg1, arg2);
+        } else if (arguments.length == 2) {
+            return CSG.ConnectorList._fromPath2DExplicit(path2D, arg1);
+        } else {
+            throw("call with path2D and either 2 direction vectors, or a function returning direction vectors");
+        }
+    };
+
+    /*
+     * calculate the connector axisvectors by calculating the "tangent" for path2D.
+     * This is undefined for start and end points, so axis for these have to be manually
+     * provided.
+     */
+    CSG.ConnectorList._fromPath2DTangents = function(path2D, start, end) {
+        // path2D
+        var axis;
+        var pathLen = path2D.points.length;
+        var result = new CSG.ConnectorList([new CSG.Connector(path2D.points[0],
+            start, [0, 0, 1])]);
+        // middle points
+        path2D.points.slice(1, pathLen - 1).forEach(function(p2, i) {
+            axis = path2D.points[i + 2].minus(path2D.points[i]).toVector3D(0);
+            result.appendConnector(new CSG.Connector(p2.toVector3D(0), axis, [0, 0, 1]));
+        });
+        result.appendConnector(new CSG.Connector(path2D.points[pathLen - 1], end, [0, 0, 1]));
+        result.closed = path2D.closed;
+        return result;
+    };
+
+    /*
+     * angleIsh: either a static angle, or a function(point) returning an angle
+     */
+    CSG.ConnectorList._fromPath2DExplicit = function(path2D, angleIsh) {
+        function getAngle(angleIsh, pt, i) {
+            if (typeof angleIsh == 'function') {
+                angleIsh = angleIsh(pt, i);
+            }
+            return angleIsh;
+        }
+        var result = new CSG.ConnectorList(
+            path2D.points.map(function(p2, i) {
+                return new CSG.Connector(p2.toVector3D(0),
+                    CSG.Vector3D.Create(1, 0, 0).rotateZ(getAngle(angleIsh, p2, i)), [0, 0, 1]);
+            })
+        );
+        result.closed = path2D.closed;
+        return result;
+    };
+
+
+    CSG.ConnectorList.prototype = {
+        setClosed: function(bool) {
+            this.closed = !!closed;
+        },
+        appendConnector: function(conn) {
+            this.connectors_.push(conn);
+        },
+        /*
+         * arguments: cagish: a cag or a function(connector) returning a cag
+         *            closed: whether the 3d path defined by connectors location
+         *              should be closed or stay open
+         *              Note: don't duplicate connectors in the path
+         * TODO: consider an option "maySelfIntersect" to close & force union all single segments
+         */
+        followWith: function(cagish) {
+            this.verify();
+            function getCag(cagish, connector) {
+                if (typeof cagish == "function") {
+                    cagish = cagish(connector.point, connector.axisvector, connector.normalvector);
+                }
+                return cagish;
+            }
+
+            var polygons = [], currCag;
+            var prevConnector = this.connectors_[this.connectors_.length - 1];
+            var prevCag = getCag(cagish, prevConnector);
+            // add walls
+            this.connectors_.forEach(function(connector, notFirst) {
+                currCag = getCag(cagish, connector);
+                if (notFirst || this.closed) {
+                    polygons.push.apply(polygons, prevCag._toWallPolygons({
+                        toConnector1: prevConnector, toConnector2: connector, cag: currCag}));
+                } else {
+                    // it is the first, and shape not closed -> build start wall
+                    polygons.push.apply(polygons,
+                        currCag._toPlanePolygons({toConnector: connector, flipped: true}));
+                }
+                if (notFirst == this.connectors_.length - 1 && !this.closed) {
+                    // build end wall
+                    polygons.push.apply(polygons,
+                        currCag._toPlanePolygons({toConnector: connector}));
+                }
+                prevCag = currCag;
+                prevConnector = connector;
+            }, this);
+            return CSG.fromPolygons(polygons).reTesselated().canonicalized();
+        },
+        /*
+         * general idea behind these checks: connectors need to have smooth transition from one to another
+         * TODO: add a check that 2 follow-on CAGs are not intersecting
+         */
+        verify: function() {
+            var connI, connI1, dPosToAxis, axisToNextAxis;
+            for (var i = 0; i < this.connectors_.length - 1; i++) {
+                connI = this.connectors_[i], connI1 = this.connectors_[i + 1];
+                if (connI1.point.minus(connI.point).dot(connI.axisvector) <= 0) {
+                    throw("Invalid ConnectorList. Each connectors position needs to be within a <90deg range of previous connectors axisvector");
+                }
+                if (connI.axisvector.dot(connI1.axisvector) <= 0) {
+                    throw("invalid ConnectorList. No neighboring connectors axisvectors may span a >=90deg angle");
+                }
+            }
+        }
+    };
 
     //////////////////////////////////////
     // # Class Path2D
@@ -5790,7 +5910,8 @@ for solid CAD anyway.
             if (flipped) {
                 csgplane = csgplane.invert();
             }
-            csgplane = csgplane.intersect(csgshell);
+            // intersectSub -> prevent premature retesselate/canonicalize
+            csgplane = csgplane.intersectSub(csgshell);
             // only keep the polygons in the z plane:
             var polys = csgplane.polygons.filter(function(polygon) {
                 return Math.abs(polygon.plane.normal.z) > 0.99;
@@ -5810,8 +5931,9 @@ for solid CAD anyway.
         _toWallPolygons: function(options) {
             // normals are going to be correct as long as toConn2.point - toConn1.point
             // points into cag normal direction (check in caller)
-            // options needs to have 2 connectors, walls go from
-            // toConnector1 to toConnector2
+            // arguments: options.toConnector1, options.toConnector2, options.cag
+            //     walls go from toConnector1 to toConnector2
+            //     optionally, target cag to point to - cag needs to have same number of sides as this!
             var origin = [0, 0, 0], defaultAxis = [0, 0, 1], defaultNormal = [0, 1, 0];
             var thisConnector = new CSG.Connector(origin, defaultAxis, defaultNormal);
             // arguments:
@@ -5821,10 +5943,17 @@ for solid CAD anyway.
             if (!(toConnector1 instanceof CSG.Connector && toConnector2 instanceof CSG.Connector)) {
                 throw('could not parse CSG.Connector arguments toConnector1 or toConnector2');
             }
+            if (options.cag) {
+                if (options.cag.sides.length != this.sides.length) {
+                    throw('target cag needs same sides count as start cag');
+                }
+            }
+            // target cag is same as this unless specified
+            var toCag = options.cag || this;
             var m1 = thisConnector.getTransformationTo(toConnector1, false, 0);
             var m2 = thisConnector.getTransformationTo(toConnector2, false, 0);
             var vps1 = this._toVector3DPairs(m1);
-            var vps2 = this._toVector3DPairs(m2);
+            var vps2 = toCag._toVector3DPairs(m2);
 
             var polygons = [];
             vps1.forEach(function(vp1, i) {
@@ -6100,9 +6229,9 @@ for solid CAD anyway.
             var polygons = [];
             // bottom and top
             polygons = polygons.concat(this._toPlanePolygons({translation: [0, 0, 0],
-                normalVector: normalVector, flipped: offsetVector.z < 0 ? false:true}));
+                normalVector: normalVector, flipped: !(offsetVector.z < 0)}));
             polygons = polygons.concat(this._toPlanePolygons({translation: offsetVector,
-                normalVector: normalVector.rotateZ(twistangle), flipped: offsetVector.z < 0 ? true:false}));
+                normalVector: normalVector.rotateZ(twistangle), flipped: offsetVector.z < 0}));
             // walls
             for (var i = 0; i < twiststeps; i++) {
                 var c1 = new CSG.Connector(offsetVector.times(i / twiststeps), [0, 0, offsetVector.z],
