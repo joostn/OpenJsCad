@@ -2118,11 +2118,11 @@ for solid CAD anyway.
                 [3, 0, 4],
                 [1, 0, 3],
                 [2, 1, 3]
-            ])
-            // openscad convention defines inward normals - so we have to invert here
-            .map(function(face) {
-                return [face[1], face[0], face[2]];
-            });
+            ]);
+        // openscad convention defines inward normals - so we have to invert here
+        faces.forEach(function(face) {
+            face.reverse();
+        });
         var polygons = faces.map(function(face) {
             return new CSG.Polygon(face.map(function(idx) {
                 return vertices[idx];
