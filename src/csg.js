@@ -2829,15 +2829,8 @@ for solid CAD anyway.
                 return v.transform(matrix4x4);
             });
             var newplane = this.plane.transform(matrix4x4);
-            var scalefactor = [matrix4x4.elements[0], matrix4x4.elements[5], matrix4x4.elements[10]]
-                .map(function(el) {
-                    return Math.abs(el) > 1e-5 ? el : 0;
-                })
-                .reduce(function(a, b) {
-                    return a * b;
-                });
-            if (scalefactor < 0) {
-                // the transformation includes mirroring. We need to reverse the vertex order
+            if (matrix4x4.isMirroring()) {
+                // need to reverse the vertex order
                 // in order to preserve the inside/outside orientation:
                 newvertices.reverse();
             }
@@ -5043,7 +5036,7 @@ for solid CAD anyway.
             transformation = transformation.multiply(normalsbasis.getInverseProjectionMatrix());
             // and translate to the destination point:
             transformation = transformation.multiply(CSG.Matrix4x4.translation(other.point));
-            var usAligned = us.transform(transformation);
+            // var usAligned = us.transform(transformation);
             return transformation;
         },
 
