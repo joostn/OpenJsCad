@@ -861,6 +861,56 @@ var cag = path.innerToCAG();
 return cag;
 </pre>
 
+<h2>ConnectorLists</h2>
+A CSG can be created by following a CSG.ConnectorList with a CAG, or a function returning a CAG.
+Some helper functions are provided to ease creating a CSG.ConnectorList
+<pre>
+// objective: place a cag (cagFunc or static cag) along a list of connectors.
+// cover the resulting skeleton with polygons to create the resulting CSG
+
+// The basics work like this:
+
+// create dynamic cag as function(connector)
+var cagFunc = function(point, axis, normal) {
+    return CAG.circle({radius: Math.abs((point.x-8)/10+point.length()) + 0.01});
+};
+
+// connector list
+var cs = new CSG.ConnectorList();
+for (var i = 0; i < 10; i++) {
+    cs.appendConnector(
+        new CSG.Connector([i, -i, 0], [1, -i/5, i/6], [0, 1, 0])
+    );
+}
+// create resulting CSG
+return cs.followWith(cagFunc);
+
+// To ease creating curved ConnectorLists etc., we can make one from a Path2D.
+var curvedpath = CSG.Path2D.arc({
+  center: [0,0,0],
+  radius: 10,
+  startangle: 0,
+  endangle: 180,
+  resolution: 50
+});
+
+// When creating a ConnectorList from this, it knows the points and will turn them
+// into 3d points by adding a 0 z height.
+// Then there are 2 ways to add corresponding axisvectors that define the CAG direction:
+// This signature calculates pseudo-tangents for the axisvectors. Only the first and the
+// last axisvector have to be manually given, as tangents for these cannot be found
+var cs2 = CSG.ConnectorList.fromPath2D(curvedpath, [0, 1, 0], [0, -1, 0]);
+var csg = cs2.followWith(CAG.rectangle());
+return csg;
+
+// Or if there are special requirements on the directions, these can be provided using
+// a function
+var cs3 = CSG.ConnectorList.fromPath2D(curvedpath, function(pt, i) {
+    return pt.angleDegrees() + 90;
+});
+return cs3.followWith(CAG.circle());
+
+</pre>
 
 <h2>Interactive parametric models</h2>
 It is possible to make certain parameters
