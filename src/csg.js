@@ -5055,6 +5055,8 @@ for solid CAD anyway.
         this.connectors_ = connectors ? connectors.slice() : [];
     };
 
+    CSG.ConnectorList.defaultNormal = [0, 0, 1];
+
     CSG.ConnectorList.fromPath2D = function(path2D, arg1, arg2) {
         if (arguments.length === 3) {
             return CSG.ConnectorList._fromPath2DTangents(path2D, arg1, arg2);
@@ -5075,13 +5077,15 @@ for solid CAD anyway.
         var axis;
         var pathLen = path2D.points.length;
         var result = new CSG.ConnectorList([new CSG.Connector(path2D.points[0],
-            start, [0, 0, 1])]);
+            start, CSG.ConnectorList.defaultNormal)]);
         // middle points
         path2D.points.slice(1, pathLen - 1).forEach(function(p2, i) {
             axis = path2D.points[i + 2].minus(path2D.points[i]).toVector3D(0);
-            result.appendConnector(new CSG.Connector(p2.toVector3D(0), axis, [0, 0, 1]));
-        });
-        result.appendConnector(new CSG.Connector(path2D.points[pathLen - 1], end, [0, 0, 1]));
+            result.appendConnector(new CSG.Connector(p2.toVector3D(0), axis,
+              CSG.ConnectorList.defaultNormal));
+        }, this);
+        result.appendConnector(new CSG.Connector(path2D.points[pathLen - 1], end,
+          CSG.ConnectorList.defaultNormal));
         result.closed = path2D.closed;
         return result;
     };
@@ -5099,8 +5103,9 @@ for solid CAD anyway.
         var result = new CSG.ConnectorList(
             path2D.points.map(function(p2, i) {
                 return new CSG.Connector(p2.toVector3D(0),
-                    CSG.Vector3D.Create(1, 0, 0).rotateZ(getAngle(angleIsh, p2, i)), [0, 0, 1]);
-            })
+                    CSG.Vector3D.Create(1, 0, 0).rotateZ(getAngle(angleIsh, p2, i)),
+                      CSG.ConnectorList.defaultNormal);
+            }, this)
         );
         result.closed = path2D.closed;
         return result;
@@ -6272,7 +6277,7 @@ for solid CAD anyway.
                     {toConnector1: connT1, toConnector2: connT2}));
                 connT1 = connT2;
             }
-            return CSG.fromPolygons(polygons);
+            return CSG.fromPolygons(polygons).reTesselated();
         },
 
         // check if we are a valid CAG (for debugging)
