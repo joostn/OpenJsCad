@@ -4878,13 +4878,38 @@ for solid CAD anyway.
             var newvertices = sourcepolygon.vertices.map(function(vertex) {
                 return _this.getVertex(vertex);
             });
-            return new CSG.Polygon(newvertices, newshared, newplane);
+            // two vertices that were originally very close may now have become
+            // truly identical (referring to the same CSG.Vertex object).
+            // Remove duplicate vertices:
+            var newvertices_dedup = [];
+            if(newvertices.length > 0) {
+                var prevvertextag = newvertices[newvertices.length-1].getTag();
+                newvertices.forEach(function(vertex) {
+                    var vertextag = vertex.getTag();
+                    if(vertextag != prevvertextag)
+                    {
+                        newvertices_dedup.push(vertex);
+                    }
+                    prevvertextag = vertextag;
+                });
+            }
+            // If it's degenerate, remove all vertices:
+            if(newvertices_dedup.length < 3) {
+                newvertices_dedup = [];
+            }
+            return new CSG.Polygon(newvertices_dedup, newshared, newplane);
         },
 
         getCSG: function(sourcecsg) {
             var _this = this;
-            var newpolygons = sourcecsg.polygons.map(function(polygon) {
-                return _this.getPolygon(polygon);
+            var newpolygons = [];
+            sourcecsg.polygons.forEach(function(polygon) {
+                var newpolygon = _this.getPolygon(polygon);
+                // see getPolygon above: we may get a polygon with no vertices, discard it:
+                if(newpolygon.vertices.length >= 3)
+                {
+                    newpolygons.push(newpolygon);
+                }
             });
             return CSG.fromPolygons(newpolygons);
         }
