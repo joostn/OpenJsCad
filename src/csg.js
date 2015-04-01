@@ -2722,15 +2722,25 @@ for solid CAD anyway.
             return this;
         },
 
-        // NOTE: _getSignedVolume only works on triangle polygons!
-        _getSignedVolume: function() {
-            return this.vertices[0].pos.dot(this.vertices[1].pos.cross(this.vertices[2].pos)) / 6;
+        getSignedVolume: function() {
+            var signedVolume = 0;
+            for (var i = 0; i < this.vertices.length - 2; i++) {
+                signedVolume += this.vertices[0].pos.dot(this.vertices[i+1].pos
+                    .cross(this.vertices[i+2].pos));
+            }
+            signedVolume /= 6;
+            return signedVolume;
         },
 
-        // NOTE: _getArea only works on triangle polygons!
-        _getArea: function() {
-            return this.vertices[1].pos.minus(this.vertices[0].pos)
-                .cross(this.vertices[2].pos.minus(this.vertices[1].pos)).length() / 2;
+        // Note: could calculate vectors only once to speed up
+        getArea: function() {
+            var polygonArea = 0;
+            for (var i = 0; i < this.vertices.length - 2; i++) {
+                polygonArea += this.vertices[i+1].pos.minus(this.vertices[0].pos)
+                    .cross(this.vertices[i+2].pos.minus(this.vertices[i+1].pos)).length();
+            }
+            polygonArea /= 2;
+            return polygonArea;
         },
 
 
@@ -2740,9 +2750,9 @@ for solid CAD anyway.
             var result = [];
             features.forEach(function(feature) {
                 if (feature == 'volume') {
-                    result.push(this._getSignedVolume());
+                    result.push(this.getSignedVolume());
                 } else if (feature == 'area') {
-                    result.push(this._getArea());
+                    result.push(this.getArea());
                 }
             }, this);
             return result;
@@ -4500,6 +4510,8 @@ for solid CAD anyway.
                     if (miny >= maxy) {
                         // degenerate polygon, all vertices have same y coordinate. Just ignore it from now:
                         vertices2d = [];
+                        numvertices = 0;
+                        minindex = -1;
                     } else {
                         if (!(miny in topy2polygonindexes)) {
                             topy2polygonindexes[miny] = [];
@@ -6031,6 +6043,7 @@ for solid CAD anyway.
 
         // see http://local.wasp.uwa.edu.au/~pbourke/geometry/polyarea/ :
         // Area of the polygon. For a counter clockwise rotating polygon the area is positive, otherwise negative
+        // Note(bebbi): this looks wrong. See polygon getArea()
         area: function() {
             var polygonArea = 0;
             this.sides.map(function(side) {
@@ -6260,7 +6273,7 @@ for solid CAD anyway.
             var polygons = [];
             // planes only needed if alpha > 0
             var connS = new CSG.Connector(origin, axisV, normalV);
-            if (alpha > 0 || alpha < 360) {
+            if (alpha > 0 && alpha < 360) {
                 // we need to rotate negative to satisfy wall function condition of
                 // building in the direction of axis vector
                 var connE = new CSG.Connector(origin, axisV.rotateZ(-alpha), normalV);
