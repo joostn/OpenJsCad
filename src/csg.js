@@ -616,6 +616,20 @@ for solid CAD anyway.
             return result;
         },
 
+        // cut the solid at a plane, and stretch the cross-section found along plane normal
+        stretchAtPlane: function(normal, point, length) {
+            var plane = CSG.Plane.fromNormalAndPoint(normal, point);
+            var onb = new CSG.OrthoNormalBasis(plane);
+            var m = onb.getInverseProjectionMatrix();
+            var crosssect = this.sectionCut(onb);
+            var midpiece = crosssect.extrudeInOrthonormalBasis(onb, length);//.setColor(0, 1, 0, 0.1);
+            var piece1 = this.cutByPlane(plane);
+            var piece2 = this.cutByPlane(plane.flipped());
+            var result = piece1.union([midpiece, piece2.translate(plane.normal.times(length))]);
+            return result;
+        },
+
+
         // Create the expanded shell of the solid:
         // All faces are extruded to get a thickness of 2*radius
         // Cylinders are constructed around every side
@@ -1196,22 +1210,28 @@ for solid CAD anyway.
         // This returns a 2D CAG with the 'shadow' shape of the 3D solid when projected onto the
         // plane represented by the orthonormal basis
         projectToOrthoNormalBasis: function(orthobasis) {
+            var EPS = 1e-5;
             var cags = [];
-            this.polygons.map(function(polygon) {
-                var cag = polygon.projectToOrthoNormalBasis(orthobasis);
-                if (cag.sides.length > 0) {
-                    cags.push(cag);
-                }
+            this.polygons.filter(function(p) {
+                    // only return polys in plane, others may disturb result
+                    return p.plane.normal.minus(orthobasis.plane.normal).lengthSquared() < EPS*EPS;
+                })
+                .map(function(polygon) {
+                    var cag = polygon.projectToOrthoNormalBasis(orthobasis);
+                    if (cag.sides.length > 0) {
+                        cags.push(cag);
+                    }
             });
             var result = new CAG().union(cags);
             return result;
         },
 
         sectionCut: function(orthobasis) {
+            var EPS = 1e-5;
             var plane1 = orthobasis.plane;
             var plane2 = orthobasis.plane.flipped();
-            plane1 = new CSG.Plane(plane1.normal, plane1.w + 1e-4);
-            plane2 = new CSG.Plane(plane2.normal, plane2.w + 1e-4);
+            plane1 = new CSG.Plane(plane1.normal, plane1.w);
+            plane2 = new CSG.Plane(plane2.normal, plane2.w + 5*EPS);
             var cut3d = this.cutByPlane(plane1);
             cut3d = cut3d.cutByPlane(plane2);
             return cut3d.projectToOrthoNormalBasis(orthobasis);
@@ -1500,6 +1520,7 @@ for solid CAD anyway.
             }
             if (!sidemapisempty) {
                 throw new Error("!sidemapisempty");
+            // OpenJsCad.log("!sidemapisempty");
             }
             return csg;
         },
@@ -1956,11 +1977,12 @@ for solid CAD anyway.
     //       resolution: 8,
     //     });
     CSG.roundedCube = function(options) {
+        var minRR = 1e-2; //minroundradius 1e-3 gives rounding errors already
         var center, cuberadius;
         options = options || {};
         if (('corner1' in options) || ('corner2' in options)) {
             if (('center' in options) || ('radius' in options)) {
-                throw new Error("roundedCube: should either give a radius and center parameter, or a corner1 and corner2 parameter")
+                throw new Error("roundedCube: should either give a radius and center parameter, or a corner1 and corner2 parameter");
             }
             corner1 = CSG.parseOptionAs3DVector(options, "corner1", [0, 0, 0]);
             corner2 = CSG.parseOptionAs3DVector(options, "corner2", [1, 1, 1]);
@@ -1973,116 +1995,24 @@ for solid CAD anyway.
         cuberadius = cuberadius.abs(); // negative radii make no sense
         var resolution = CSG.parseOptionAsFloat(options, "resolution", CSG.defaultResolution3D);
         if (resolution < 4) resolution = 4;
-        var roundradius = CSG.parseOptionAsFloat(options, "roundradius", 0.2);
-        var innercuberadius = cuberadius;
-        innercuberadius = innercuberadius.minus(new CSG.Vector3D(roundradius));
-        var result = CSG.cube({
-            center: center,
-            radius: [cuberadius.x, innercuberadius.y, innercuberadius.z]
-        });
-        result = result.unionSub(CSG.cube({
-            center: center,
-            radius: [innercuberadius.x, cuberadius.y, innercuberadius.z]
-        }), false, false);
-        result = result.unionSub(CSG.cube({
-            center: center,
-            radius: [innercuberadius.x, innercuberadius.y, cuberadius.z]
-        }), false, false);
-        for (var level = 0; level < 2; level++) {
-            var z = innercuberadius.z;
-            if (level == 1) z = -z;
-            var p1 = new CSG.Vector3D(innercuberadius.x, innercuberadius.y, z).plus(center);
-            var p2 = new CSG.Vector3D(innercuberadius.x, -innercuberadius.y, z).plus(center);
-            var p3 = new CSG.Vector3D(-innercuberadius.x, -innercuberadius.y, z).plus(center);
-            var p4 = new CSG.Vector3D(-innercuberadius.x, innercuberadius.y, z).plus(center);
-            var sphere = CSG.sphere({
-                center: p1,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(sphere, false, false);
-            sphere = CSG.sphere({
-                center: p2,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(sphere, false, false);
-            sphere = CSG.sphere({
-                center: p3,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(sphere, false, false);
-            sphere = CSG.sphere({
-                center: p4,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(sphere, false, true);
-            var cylinder = CSG.cylinder({
-                start: p1,
-                end: p2,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(cylinder, false, false);
-            cylinder = CSG.cylinder({
-                start: p2,
-                end: p3,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(cylinder, false, false);
-            cylinder = CSG.cylinder({
-                start: p3,
-                end: p4,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(cylinder, false, false);
-            cylinder = CSG.cylinder({
-                start: p4,
-                end: p1,
-                radius: roundradius,
-                resolution: resolution
-            });
-            result = result.unionSub(cylinder, false, false);
-            if (level === 0) {
-                var d = new CSG.Vector3D(0, 0, -2 * z);
-                cylinder = CSG.cylinder({
-                    start: p1,
-                    end: p1.plus(d),
-                    radius: roundradius,
-                    resolution: resolution
-                });
-                result = result.unionSub(cylinder);
-                cylinder = CSG.cylinder({
-                    start: p2,
-                    end: p2.plus(d),
-                    radius: roundradius,
-                    resolution: resolution
-                });
-                result = result.unionSub(cylinder);
-                cylinder = CSG.cylinder({
-                    start: p3,
-                    end: p3.plus(d),
-                    radius: roundradius,
-                    resolution: resolution
-                });
-                result = result.unionSub(cylinder);
-                cylinder = CSG.cylinder({
-                    start: p4,
-                    end: p4.plus(d),
-                    radius: roundradius,
-                    resolution: resolution
-                });
-                result = result.unionSub(cylinder, false, true);
-            }
+        if (resolution%2 == 1 && resolution < 8) resolution = 8; // avoid ugly
+        var roundradius = CSG.parseOptionAs3DVector(options, "roundradius", [0.2, 0.2, 0.2]);
+        // slight hack for now - total radius stays ok
+        roundradius = CSG.Vector3D.Create(Math.max(roundradius.x, minRR), Math.max(roundradius.y, minRR), Math.max(roundradius.z, minRR));
+        var innerradius = cuberadius.minus(roundradius);
+        if (innerradius.x < 0 || innerradius.y < 0 || innerradius.z < 0) {
+            throw('roundradius <= radius!');
         }
-        result = result.reTesselated();
-        result.properties.roundedCube = new CSG.Properties();
-        result.properties.roundedCube.center = new CSG.Vertex(center);
-        result.properties.roundedCube.facecenters = [
+        var res = CSG.sphere({radius:1, resolution:resolution});
+        res = res.scale(roundradius);
+        cuberadius.x && (res = res.stretchAtPlane([1, 0, 0], [0, 0, 0], cuberadius.x));
+        cuberadius.y && (res = res.stretchAtPlane([0, 1, 0], [0, 0, 0], cuberadius.y));
+        cuberadius.z && (res = res.stretchAtPlane([0, 0, 1], [0, 0, 0], cuberadius.z));
+        res = res.translate([-cuberadius.x/2, -cuberadius.y/2, -cuberadius.z/2]);
+        res = res.reTesselated();
+        res.properties.roundedCube = new CSG.Properties();
+        res.properties.roundedCube.center = new CSG.Vertex(center);
+        res.properties.roundedCube.facecenters = [
             new CSG.Connector(new CSG.Vector3D([cuberadius.x, 0, 0]).plus(center), [1, 0, 0], [0, 0, 1]),
             new CSG.Connector(new CSG.Vector3D([-cuberadius.x, 0, 0]).plus(center), [-1, 0, 0], [0, 0, 1]),
             new CSG.Connector(new CSG.Vector3D([0, cuberadius.y, 0]).plus(center), [0, 1, 0], [0, 0, 1]),
@@ -2090,7 +2020,7 @@ for solid CAD anyway.
             new CSG.Connector(new CSG.Vector3D([0, 0, cuberadius.z]).plus(center), [0, 0, 1], [1, 0, 0]),
             new CSG.Connector(new CSG.Vector3D([0, 0, -cuberadius.z]).plus(center), [0, 0, -1], [1, 0, 0])
         ];
-        return result;
+        return res;
     };
 
     /**
@@ -4129,7 +4059,7 @@ for solid CAD anyway.
     CSG.Line3D.fromPoints = function(p1, p2) {
         p1 = new CSG.Vector3D(p1);
         p2 = new CSG.Vector3D(p2);
-        var direction = p2.minus(p1).unit();
+        var direction = p2.minus(p1);
         return new CSG.Line3D(p1, direction);
     };
 
@@ -5727,7 +5657,10 @@ for solid CAD anyway.
     // as constructed by CAG._toCSGWall(-1, 1). This is so we can use the 3D union(), intersect() etc
     CAG.fromFakeCSG = function(csg) {
         var sides = csg.polygons.map(function(p) {
-            return CAG.Side.fromFakePolygon(p);
+            return CAG.Side._fromFakePolygon(p);
+            })
+            .filter(function(s) {
+                return s !== null;
         });
         return CAG.fromSides(sides);
     };
@@ -6008,14 +5941,11 @@ for solid CAD anyway.
                 cags = [cag];
             }
             var r = this._toCSGWall(-1, 1);
-            cags.map(function(cag) {
-                r = r.unionSub(cag._toCSGWall(-1, 1), false, false);
-            });
-            r = r.reTesselated();
-            r = r.canonicalized();
-            cag = CAG.fromFakeCSG(r);
-            var cag_canonicalized = cag.canonicalized();
-            return cag_canonicalized;
+            var r = r.union(
+                cags.map(function(cag) {
+                    return cag._toCSGWall(-1, 1).reTesselated();
+                }), false, false)
+            return CAG.fromFakeCSG(r).canonicalized();
         },
 
         subtract: function(cag) {
@@ -6103,13 +6033,14 @@ for solid CAD anyway.
             return [minpoint, maxpoint];
         },
 
-        isSelfIntersecting: function() {
+        isSelfIntersecting: function(debug) {
             var numsides = this.sides.length;
             for (var i = 0; i < numsides; i++) {
                 var side0 = this.sides[i];
                 for (var ii = i + 1; ii < numsides; ii++) {
                     var side1 = this.sides[ii];
                     if (CAG.linesIntersect(side0.vertex0.pos, side0.vertex1.pos, side1.vertex0.pos, side1.vertex1.pos)) {
+                        if (debug) { OpenJsCad.log(side0); OpenJsCad.log(side1);}
                         return true;
                     }
                 }
@@ -6226,7 +6157,7 @@ for solid CAD anyway.
             }
             var extruded = this.extrude({
                 offset: [0, 0, depth]
-            }).translate([0, 0, -depth / 2]);
+            });
             var matrix = orthonormalbasis.getInverseProjectionMatrix();
             extruded = extruded.transform(matrix);
             return extruded;
@@ -6319,9 +6250,11 @@ for solid CAD anyway.
         },
 
         // check if we are a valid CAG (for debugging)
+        // NOTE(bebbi) uneven side count doesn't work because rounding with EPS isn't taken into account
         check: function() {
+            var EPS = 1e-5;
             var errors = [];
-            if (this.isSelfIntersecting()) {
+            if (this.isSelfIntersecting(true)) {
                 errors.push("Self intersects");
             }
             var pointcount = {};
@@ -6341,7 +6274,7 @@ for solid CAD anyway.
                 }
             }
             var area = this.area();
-            if (area < 1e-5) {
+            if (area < EPS*EPS) {
                 errors.push("Area is " + area);
             }
             if (errors.length > 0) {
@@ -6612,37 +6545,40 @@ for solid CAD anyway.
         this.vertex1 = vertex1;
     };
 
-    CAG.Side.fromFakePolygon = function(polygon) {
-        if (polygon.vertices.length != 4) {
-            throw new Error("Assertion failed - 1");
-        }
-        var pointsZeroZ = [];
-        var indicesZeroZ = [];
-        for (var i = 0; i < 4; i++) {
-            var pos = polygon.vertices[i].pos;
-            if ((pos.z >= -1.001) && (pos.z < -0.999)) {} else if ((pos.z >= 0.999) && (pos.z < 1.001)) {} else {
-                throw new Error("Assertion failed - 2");
+    CAG.Side._fromFakePolygon = function(polygon) {
+        polygon.vertices.forEach(function(v) {
+            if (!((v.pos.z >= -1.001) && (v.pos.z < -0.999)) && !((v.pos.z >= 0.999) && (v.pos.z < 1.001))) {
+                throw("Assertion failed: _fromFakePolygon expects abs z values of 1");
             }
-            if (pos.z > 0) {
-                pointsZeroZ.push(new CSG.Vector2D(pos.x, pos.y));
-                indicesZeroZ.push(i);
+        })
+        // this can happen based on union, seems to be residuals -
+        // return null and handle in caller
+        if (polygon.vertices.length < 4) {
+            return null;
+        }
+        var reverse = false;
+        var vert1Indices = [];
+        var pts2d = polygon.vertices.filter(function(v, i) {
+            if (v.pos.z > 0) {
+                vert1Indices.push(i);
+                return true;
             }
+        })
+        .map(function(v) {
+            return new CSG.Vector2D(v.pos.x, v.pos.y);
+        });
+        if (pts2d.length != 2) {
+            throw('Assertion failed: _fromFakePolygon: not enough points found')
         }
-        if (pointsZeroZ.length != 2) {
-            throw new Error("Assertion failed - 3");
-        }
-        var d = indicesZeroZ[1] - indicesZeroZ[0];
-        var p1, p2;
-        if (d == 1) {
-            p1 = pointsZeroZ[1];
-            p2 = pointsZeroZ[0];
-        } else if (d == 3) {
-            p1 = pointsZeroZ[0];
-            p2 = pointsZeroZ[1];
+        var d = vert1Indices[1] - vert1Indices[0];
+        if (d == 1 || d == 3) {
+            if (d == 1) {
+                pts2d.reverse();
+            }
         } else {
-            throw new Error("Assertion failed - 4");
+            throw('Assertion failed: _fromFakePolygon: unknown index ordering');
         }
-        var result = new CAG.Side(new CAG.Vertex(p1), new CAG.Vertex(p2));
+        var result = new CAG.Side(new CAG.Vertex(pts2d[0]), new CAG.Vertex(pts2d[1]));
         return result;
     };
 
