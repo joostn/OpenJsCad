@@ -349,6 +349,13 @@ var cube = CSG.roundedCube({
   resolution: 8,        // optional
 });
 
+// roundedCube works with a vector radius too:
+var cube = CSG.roundedCube({
+  radius: [10, 5, 8],
+  roundradius: [3, 5, 0.01],
+  resolution: 24
+});
+
 // a polyhedron (point ordering for faces: when looking at the face from the outside inwards, the points must be clockwise):
 var polyhedron = CSG.polyhedron({
    points:[ [10,10,0],[10,-10,0],[-10,-10,0],[-10,10,0], // the four points at base
@@ -467,6 +474,17 @@ var cube1 = CSG.cube({radius: 1.0});
 var cube2 = CSG.cube({radius: 1.0}).translate([-0.3, -0.3, -0.3]);
 var csg = cube1.subtract(cube2);
 var rounded = csg.expand(0.2, 8); 
+</pre>
+
+<h2>StretchAtPlane</h2>
+This cuts the object at the plane, and stretches the cross-section there by length amount.
+
+<pre>
+var stretched_csg = csg.stretchAtPlane(normal, point, length);
+In the gear example, function main, try replacing
+return gear;
+with
+return gear.stretchAtPlane([0, 0.05, 1], [0, 0, 0], 30);
 </pre>
 
 <h2>Using Properties</h2>
