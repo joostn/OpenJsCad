@@ -1518,8 +1518,8 @@ for solid CAD anyway.
                 break;
             }
             if (!sidemapisempty) {
-                throw new Error("!sidemapisempty");
-            // OpenJsCad.log("!sidemapisempty");
+                // throw new Error("!sidemapisempty");
+            OpenJsCad.log("!sidemapisempty");
             }
             return csg;
         },
@@ -1976,6 +1976,7 @@ for solid CAD anyway.
     //       resolution: 8,
     //     });
     CSG.roundedCube = function(options) {
+        var EPS = 1e-5;
         var minRR = 1e-2; //minroundradius 1e-3 gives rounding errors already
         var center, cuberadius;
         options = options || {};
@@ -2004,10 +2005,10 @@ for solid CAD anyway.
         }
         var res = CSG.sphere({radius:1, resolution:resolution});
         res = res.scale(roundradius);
-        cuberadius.x && (res = res.stretchAtPlane([1, 0, 0], [0, 0, 0], cuberadius.x));
-        cuberadius.y && (res = res.stretchAtPlane([0, 1, 0], [0, 0, 0], cuberadius.y));
-        cuberadius.z && (res = res.stretchAtPlane([0, 0, 1], [0, 0, 0], cuberadius.z));
-        res = res.translate([-cuberadius.x/2, -cuberadius.y/2, -cuberadius.z/2]);
+        innerradius.x > EPS && (res = res.stretchAtPlane([1, 0, 0], [0, 0, 0], innerradius.x));
+        innerradius.y > EPS && (res = res.stretchAtPlane([0, 1, 0], [0, 0, 0], innerradius.y));
+        innerradius.z > EPS && (res = res.stretchAtPlane([0, 0, 1], [0, 0, 0], innerradius.z));
+        res = res.translate([-innerradius.x/2, -innerradius.y/2, -innerradius.z/2]);
         res = res.reTesselated();
         res.properties.roundedCube = new CSG.Properties();
         res.properties.roundedCube.center = new CSG.Vertex(center);
