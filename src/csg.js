@@ -2005,10 +2005,10 @@ for solid CAD anyway.
         }
         var res = CSG.sphere({radius:1, resolution:resolution});
         res = res.scale(roundradius);
-        innerradius.x > EPS && (res = res.stretchAtPlane([1, 0, 0], [0, 0, 0], innerradius.x));
-        innerradius.y > EPS && (res = res.stretchAtPlane([0, 1, 0], [0, 0, 0], innerradius.y));
-        innerradius.z > EPS && (res = res.stretchAtPlane([0, 0, 1], [0, 0, 0], innerradius.z));
-        res = res.translate([-innerradius.x/2, -innerradius.y/2, -innerradius.z/2]);
+        innerradius.x > EPS && (res = res.stretchAtPlane([1, 0, 0], [0, 0, 0], 2*innerradius.x));
+        innerradius.y > EPS && (res = res.stretchAtPlane([0, 1, 0], [0, 0, 0], 2*innerradius.y));
+        innerradius.z > EPS && (res = res.stretchAtPlane([0, 0, 1], [0, 0, 0], 2*innerradius.z));
+        res = res.translate([-innerradius.x+center.x, -innerradius.y+center.y, -innerradius.z+center.z]);
         res = res.reTesselated();
         res.properties.roundedCube = new CSG.Properties();
         res.properties.roundedCube.center = new CSG.Vertex(center);
