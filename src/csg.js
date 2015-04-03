@@ -620,9 +620,8 @@ for solid CAD anyway.
         stretchAtPlane: function(normal, point, length) {
             var plane = CSG.Plane.fromNormalAndPoint(normal, point);
             var onb = new CSG.OrthoNormalBasis(plane);
-            var m = onb.getInverseProjectionMatrix();
             var crosssect = this.sectionCut(onb);
-            var midpiece = crosssect.extrudeInOrthonormalBasis(onb, length);//.setColor(0, 1, 0, 0.1);
+            var midpiece = crosssect.extrudeInOrthonormalBasis(onb, length);
             var piece1 = this.cutByPlane(plane);
             var piece2 = this.cutByPlane(plane.flipped());
             var result = piece1.union([midpiece, piece2.translate(plane.normal.times(length))]);
