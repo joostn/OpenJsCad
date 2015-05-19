@@ -1119,15 +1119,16 @@ function main() {
 </pre>
 
 <h2>Miscellaneous</h2>
-Solids can be given a color using the setColor(r, g, b) function. Beware: this returns a new solid,
+Solids can be given a color using the setColor() function. setColor() expects an array with 3 or 4
+elements [r, g, b, [alpha]]. Beware: this returns a new solid,
 the original solid is not modified! Faces of the solid will keep their original color when doing
-CSG operations (union() etc). Colors values range between 0.0 and 1.0 (not 255).  
+CSG operations (union() etc). Color values range between 0.0 and 1.0 (not 255).  
 <pre>
 var cube1 = CSG.cube({radius: 10});
-cube1 = cube1.setColor(0.5, 0, 0);
+cube1 = cube1.setColor([0.5, 0, 0]);
 
 var cube2 = CSG.cube({radius: 10});
-cube2 = cube2.setColor(0, 0.5, 0);
+cube2 = cube2.setColor([0, 0.5, 0]);
 cube2 = cube2.translate([5,1,4]);
 
 var result = cube1.subtract(cube2);
