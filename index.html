@@ -671,15 +671,15 @@ places the 2D area onto the 3D z=0 plane, and extrudes in the specified directio
 twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
 The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
 between the bottom and top surface.</li>
-<li>To extrude in an arbitrary plane in 3D space, use extrudeInOrthonormalBasis(orthonormalbasis, depth). 
+<li>To extrude in an arbitrary plane in 3D space, use extrudeInOrthonormalBasis(orthonormalbasis, depth [, options]). 
 An orthonormal basis is a combination of a plane and a right-hand vector (read more about orthonormal bases below).
-depth is the extrusion thickness. This function extrudes symmetrically: half of the extrusion is in front of the plane, half is
-back from the plane.
+depth is the extrusion thickness. By default this extrudes asymmetrically, extending from the plane. Currently one option is supported:
+{symmetrical: true}, which causes the extrusion to be done symmetrically in two directions about the plane.
 </li>
-<li>To extrude in one of the standard cartesian planes, use extrudeInPlane(axis1, axis2, depth). axis1 and axis 2 are one
+<li>To extrude in one of the standard cartesian planes, use extrudeInPlane(axis1, axis2, depth [, options]). axis1 and axis 2 are one
    of ["X","Y","Z","-X","-Y","-Z"]. The 2D X coordinate is mapped to the 3D axis specified by axis1, and the 2D
 Y coordinate is mapped to the 3D axis specified by axis2. For example, extrudeInPlane("-Z","X", 10) extrudes such that the
-2D x coordinate maps to the 3D negated z coordinate, and the 2D y coordinate maps to the 3D x coordinate.</li>
+2D x coordinate maps to the 3D negated z coordinate, and the 2D y coordinate maps to the 3D x coordinate. For options see extrudeInOrthonormalBasis above.</li>
 </ul>
 A 3D solid can be converted back to a 2D CAG using sectionCut() and projectToOrthoNormalBasis().
 sectionCut() cuts the solid by a plane and returns the 2D intersection as a CAG object.
