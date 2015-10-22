@@ -27,10 +27,10 @@ if(typeof module !== 'undefined') {    // used via nodejs
 ////////////////////////////////////////////
 
 // standard pixel size at arms length on 90dpi screens
-sax.SAXParser.prototype.cssPxUnit = 0.28;
+sax.SAXParser.prototype.cssPxUnit = 0.2822222;
 
 // units for converting CSS2 points/length, i.e. CSS2 value / pxPmm
-sax.SAXParser.prototype.pxPmm = 1 / 0.28;              // used for scaling SVG coordinates(PX) to CAG coordinates(MM)
+sax.SAXParser.prototype.pxPmm = 1 / 0.2822222;       // used for scaling SVG coordinates(PX) to CAG coordinates(MM)
 sax.SAXParser.prototype.inchMM = 1 / (1/0.039370);     // used for scaling SVG coordinates(IN) to CAG coordinates(MM)
 sax.SAXParser.prototype.ptMM = 1 / (1/0.039370/72);    // used for scaling SVG coordinates(IN) to CAG coordinates(MM)
 sax.SAXParser.prototype.pcMM = 1 / (1/0.039370/72*12); // used for scaling SVG coordinates(PC) to CAG coordinates(MM)
@@ -187,32 +187,41 @@ sax.SAXParser.prototype.svgColors = {
     };
 
 // Calculate the CAG length/size from the given CSS (SVG) value
-sax.SAXParser.prototype.cagLength = function(css) {
+sax.SAXParser.prototype.cagLengthX = function(css) {
+  return this.cagLength(css,this.svgUnitsPmm[0]);
+}
+sax.SAXParser.prototype.cagLengthY = function(css) {
+  return this.cagLength(css,this.svgUnitsPmm[1]);
+}
+
+sax.SAXParser.prototype.cagLength = function(css,unit) {
   var v = parseFloat(css); // number part
   if (isNaN(v)) { v = 0; }
   if (v == 0) return v;
   if (css.search(/EM/i) > 0) {
-    return v; // font size
+    v = v; // font size
   } else
   if (css.search(/EX/i) > 0) {
-    return v; // x-height of font
+    v = v; // x-height of font
   } else
   if (css.search(/MM/i) > 0) {
-    return v; // absolute milimeters
+    v = v; // absolute millimeters
   } else
   if (css.search(/CM/i) > 0) {
-    return (v * 10).toFixed(4); // absolute centimeters > millimeters
+    v =  (v * 10).toFixed(4); // absolute centimeters > millimeters
   } else
   if (css.search(/IN/i) > 0) {
-    return (v / inchMM).toFixed(4); // absolute inches > millimeters
+    v = (v / inchMM).toFixed(4); // absolute inches > millimeters
   } else
   if (css.search(/PT/i) > 0) {
-    return (v / ptMM).toFixed(4); // absolute points > millimeters
+    v = (v / ptMM).toFixed(4); // absolute points > millimeters
   } else
   if (css.search(/PC/i) > 0) {
-    return (v / pcMM).toFixed(4); // absolute picas > millimeters
+    v = (v / pcMM).toFixed(4); // absolute picas > millimeters
+  } else {
+    v = (v / unit).toFixed(4); // absolute pixels(units) > millimeters
   }
-  return (v / this.pxPmm).toFixed(4); // absolute pixels > millimeters
+  return parseFloat(v);
 }
 
 // convert the SVG color specification to CAG RGB
@@ -296,11 +305,11 @@ sax.SAXParser.prototype.svgPresentation = function(obj,element) {
   if ('FILL-OPACITY' in element) { obj.opacity = element.FILL-OPACITY; }
 // presentation attributes for lines
   if ('STROKE-WIDTH' in element) {
-    obj.strokeWidth = this.cagLength(element['STROKE-WIDTH']);
+    obj.strokeWidth = this.cagLengthX(element['STROKE-WIDTH']);
   } else {
     var sw = this.cssStyle(element,'stroke-width');
     if (sw !== null) {
-      obj.strokeWidth = this.cagLength(sw);
+      obj.strokeWidth = this.cagLengthX(sw);
     }
   }
   if ('STROKE' in element) {
@@ -323,7 +332,7 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
     if (s !== null) { list = s; }
   }
   if (list !== null) {
-  // matrix | translate | scale | rotate | skewX | skewY
+    cag.transforms = [];
     var exp = new RegExp('\\w+\\(.+\\)','i');
     var v = exp.exec(list);
     while (v !== null) {
@@ -332,20 +341,23 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
       var t = list.slice(s,e); // the transform
       t = t.trim();
     // add the transform to the CAG
+    // which are applied in the order provided
       var n = t.slice(0,t.indexOf('('));
       var a = t.slice(t.indexOf('(')+1,t.indexOf(')')).trim();
       if (a.indexOf(',') > 0) { a = a.split(','); } else { a = a.split(' '); }
       switch (n) {
         case 'translate':
-          if (a.length == 1) a.push(0); // as per SVG
-          cag.translate = [this.cagLength(a[0]),this.cagLength(a[1])];
+          var o = {translate: [this.cagLengthX(a[0]), -(this.cagLengthY(a[1]))]};
+          cag.transforms.push(o);
           break;
         case 'scale':
           if (a.length == 1) a.push(a[0]); // as per SVG
-          cag.scale = a;
+          var o = {scale: [a[0], a[1]]};
+          cag.transforms.push(o);
           break;
         case 'rotate':
-          cag.rotate = a;
+          var o = {rotate: -(a)};
+          cag.transforms.push(o);
           break;
         //case 'matrix':
         //case 'skewX':
@@ -360,21 +372,36 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
   }
 }
 
-// treat each SVG element like a group
 sax.SAXParser.prototype.svgSvg = function(element) {
-  var obj = {type: 'svg', width: 300, height: 300}; // default viewport with CAG coordinates
+// default viewport with CAG coordinates and units
+  var obj = {type: 'svg', width: 300, height: 300};
 
-  if ('WIDTH' in element) { obj.width = this.cagLength(element.WIDTH); }
-  if ('HEIGHT' in element) { obj.height = this.cagLength(element.HEIGHT); }
   if ('PXPMM' in element) {
   // WOW! a supplied value for pixel widths!!!
-    this.pxPmm = parseFloat(element.PXPMM);
-    if (isNaN(this.pxPmm)) { this.pxPmm = 1/cssPxUnit; } // use the default calculation
-    if (this.svgGroups.length == 0) {
-      obj.pxpmm = this.pxPmm;
-      console.log('*****PIXELS PER MM: '+this.pxPmm);
-    }
+    //this.pxPmm = parseFloat(element.PXPMM);
+    //if (isNaN(this.pxPmm)) { this.pxPmm = 1/this.cssPxUnit; } // use the default calculation
+    //if (this.svgGroups.length == 0) {
+    //  obj.pxPmm = this.pxPmm;
+    //  console.log('*****PIXELS PER MM: '+this.pxPmm);
+    //}
   }
+  if ('WIDTH' in element) { obj.width = this.cagLength(element.WIDTH,1.0); }
+  if ('HEIGHT' in element) { obj.height = this.cagLength(element.HEIGHT,1.0); }
+  if ('VIEWBOX' in element) {
+    var list = element.VIEWBOX.trim();
+    var exp = new RegExp('(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)','i');
+    var v = exp.exec(list);
+    if (v !== null) {
+    // calculate units per mm of the view box
+      var x = 1 / (obj.width  / parseFloat(v[3]));
+      var y = 1 / (obj.height / parseFloat(v[4]));
+      obj.unitsPmm = [x,y];
+    }
+  } else {
+  // default units per mm of the view box
+    obj.unitsPmm = [this.pxPmm,this.pxPmm];
+  }
+  obj.unitsPer = Math.sqrt((obj.width*obj.width) + (obj.height*obj.height))/Math.SQRT2;
 
 // core attributes
   this.svgCore(obj,element);
@@ -391,8 +418,8 @@ sax.SAXParser.prototype.svgEllipse = function(element) {
   obj.cy = 0;
   obj.rx = 0;
   obj.ry = 0;
-  if ('RX' in element) { obj.rx = this.cagLength(element.RX); }
-  if ('RY' in element) { obj.ry = this.cagLength(element.RY); }
+  if ('RX' in element) { obj.rx = this.cagLengthX(element.RX); }
+  if ('RY' in element) { obj.ry = this.cagLengthY(element.RY); }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -409,10 +436,10 @@ sax.SAXParser.prototype.svgLine = function(element) {
   obj.x2 = 0;
   obj.y2 = 0;
   obj.strokeWidth  = 0; // width of line, from style: stroke-width
-  if ('X1' in element) { obj.x1 = this.cagLength(element.X1); }
-  if ('Y1' in element) { obj.y1 = this.cagLength(element.Y1); }
-  if ('X2' in element) { obj.x2 = this.cagLength(element.X2); }
-  if ('Y2' in element) { obj.y2 = this.cagLength(element.Y2); }
+  if ('X1' in element) { obj.x1 = this.cagLengthX(element.X1); }
+  if ('Y1' in element) { obj.y1 = -(this.cagLengthY(element.Y1)); }
+  if ('X2' in element) { obj.x2 = this.cagLengthX(element.X2); }
+  if ('Y2' in element) { obj.y2 = -(this.cagLengthY(element.Y2)); }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -424,14 +451,12 @@ sax.SAXParser.prototype.svgLine = function(element) {
 
 sax.SAXParser.prototype.svgListOfPoints = function(list) {
   var points = [];
-  var exp = new RegExp('\\s*\\S+\\s*,\\s*\\S+','i');
+  var exp = new RegExp('([\\d\\-\\+\\.]+)[\\s,]+([\\d\\-\\+\\.]+)[\\s,]*','i');
   var v = exp.exec(list);
   while (v !== null) {
     var point = v[0];
     var next = exp.lastIndex+point.length;
-    point = point.trim();
-    point = point.split(',');
-    point = {x: this.cagLength(point[0]), y: this.cagLength(point[1]) };
+    point = {x: this.cagLengthX(v[1]), y: -(this.cagLengthY(v[2])) };
     points.push(point);
     list = list.slice(next,list.length);
     v = exp.exec(list);
@@ -470,28 +495,23 @@ sax.SAXParser.prototype.svgPolygon = function(element) {
 }
 
 sax.SAXParser.prototype.svgRect = function(element) {
-  var obj = {type:'rect'};
-  obj.x = 0;
-  obj.y = 0;
-  obj.rx = 0;
-  obj.ry = 0;
-  obj.width = 0;
-  obj.height = 0;
-  if ('X' in element) { obj.x = this.cagLength(element.X); }
-  if ('Y' in element) { obj.y = this.cagLength(element.Y); }
+  var obj = {type:'rect', x: 0, y: 0, rx: 0, ry: 0, width: 0, height: 0};
+
+  if ('X' in element) { obj.x = this.cagLengthX(element.X); }
+  if ('Y' in element) { obj.y = -(this.cagLengthY(element.Y)); }
   if ('RX' in element) {
-    obj.rx = this.cagLength(element.RX);
+    obj.rx = this.cagLengthX(element.RX);
     if (!('RY' in element)) { obj.ry = obj.rx } // by SVG specification
   }
   if ('RY' in element) {
-    obj.ry = this.cagLength(element.RY);
+    obj.ry = this.cagLengthY(element.RY);
     if (!('RX' in element)) { obj.rx = obj.ry } // by SVG specification
   }
   if (obj.rx != obj.ry) {
     console.log('Warning: SVG element contains unsupported RX RY radius');
   }
-  if ('WIDTH' in element) { obj.width = this.cagLength(element.WIDTH); }
-  if ('HEIGHT' in element) { obj.height = this.cagLength(element.HEIGHT); }
+  if ('WIDTH' in element) { obj.width = this.cagLengthX(element.WIDTH); }
+  if ('HEIGHT' in element) { obj.height = this.cagLengthY(element.HEIGHT); }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -502,13 +522,11 @@ sax.SAXParser.prototype.svgRect = function(element) {
 }
 
 sax.SAXParser.prototype.svgCircle = function(element) {
-  var obj = {type: 'circle'};
-  obj.x = 0;
-  obj.y = 0;
-  obj.radius = 0;
-  if ('CX' in element) { obj.x = this.cagLength(element.CX); }
-  if ('CY' in element) { obj.y = this.cagLength(element.CY); }
-  if ('R' in element) { obj.radius = this.cagLength(element.R); }
+  var obj = {type: 'circle', x: 0, y: 0, radius: 0};
+
+  if ('CX' in element) { obj.x = this.cagLengthX(element.CX); }
+  if ('CY' in element) { obj.y = -(this.cagLengthY(element.CY)); }
+  if ('R' in element) { obj.radius = this.cagLengthX(element.R); }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -546,9 +564,9 @@ sax.SAXParser.prototype.svgUse = function(element) {
   this.svgPresentation(obj,element);
 
   if ('X' in element && 'Y' in element) {
-    var x = this.cagLength(element.X);
-    var y = this.cagLength(element.Y);
-    obj.translate = [this.cagLength(x),this.cagLength(y)];
+    var x = this.cagLengthX(element.X);
+    var y = this.cagLengthY(element.Y);
+    obj.translate = [this.cagLengthX(x),this.cagLengthY(y)];
   }
 
   obj.objects = [];
@@ -567,10 +585,12 @@ sax.SAXParser.prototype.svgUse = function(element) {
 }
 
 // processing controls
-sax.SAXParser.prototype.svgObjects = [];    // named objects
-sax.SAXParser.prototype.svgGroups  = [];    // groups of objects
-sax.SAXParser.prototype.svgInDefs  = false; // svg DEFS element in process
-sax.SAXParser.prototype.svgObj     = null;  // svg in object form
+sax.SAXParser.prototype.svgObjects  = [];    // named objects
+sax.SAXParser.prototype.svgGroups   = [];    // groups of objects
+sax.SAXParser.prototype.svgInDefs   = false; // svg DEFS element in process
+sax.SAXParser.prototype.svgObj      = null;  // svg in object form
+sax.SAXParser.prototype.svgUnitsPmm = [];
+sax.SAXParser.prototype.svgUnitsPer = 0;
 
 CAG.codify = function(group,level) {
   var indent = '  ';
@@ -585,7 +605,8 @@ CAG.codify = function(group,level) {
     code += 'function main(p) {\n';
   }
   var ln = 'cag'+level;
-  code += indent + 'var '+ln+' = CAG.rectangle({radius: [0.01,0.01]});\n';
+  //code += indent + 'var '+ln+' = CAG.rectangle({radius: [0.01,0.01]});\n';
+  code += indent + 'var '+ln+' = null;\n';
 // generate code for all objects
   for (i = 0; i < group.objects.length; i++) {
     var obj = group.objects[i];
@@ -596,10 +617,12 @@ CAG.codify = function(group,level) {
         code += indent+'var '+on+' = cag'+(level+1)+';\n';
         break;
       case 'rect':
+        var x = (obj.x+(obj.width/2)).toFixed(4);  // position the object via the center
+        var y = (obj.y-(obj.height/2)).toFixed(4); // position the object via the center
         if (obj.rx == 0) {
-          code += indent+'var '+on+' = CAG.rectangle({center: ['+obj.x+','+obj.y+'], radius: ['+obj.width/2+','+obj.height/2+']});\n';
+          code += indent+'var '+on+' = CAG.rectangle({center: ['+x+','+y+'], radius: ['+obj.width/2+','+obj.height/2+']});\n';
         } else {
-          code += indent+'var '+on+' = CAG.roundedRectangle({center: ['+obj.x+','+obj.y+'], radius: ['+obj.width/2+','+obj.height/2+'], roundradius: '+obj.rx+'});\n';
+          code += indent+'var '+on+' = CAG.roundedRectangle({center: ['+x+','+y+'], radius: ['+obj.width/2+','+obj.height/2+'], roundradius: '+obj.rx+'});\n';
         }
         break;
       case 'circle':
@@ -640,20 +663,30 @@ CAG.codify = function(group,level) {
       default:
         break;
     }
-    if ('rotate' in obj) {
-      code += indent+on+' = '+on+'.rotateZ(-('+obj.rotate[0]+'));\n';
-    }
-    if ('translate' in obj) {
-      code += indent+on+' = '+on+'.translate(['+obj.translate[0]+','+obj.translate[1]+']);\n';
-    }
-    if ('scale' in obj) {
-      code += indent+on+' = '+on+'.scale(['+obj.scale[0]+','+obj.scale[1]+']);\n';
-    }
     if ('fill' in obj) {
     // FIXME when CAG supports color
     //  code += indent+on+' = '+on+'.setColor(['+obj.fill[0]+','+obj.fill[1]+','+obj.fill[2]+']);\n';
     }
-    code += indent + ln +' = '+ln+'.union('+on+');\n';
+    if ('transforms' in obj) {
+      var j = 0;
+      for (j = 0; j < obj.transforms.length; j++) {
+        var t = obj.transforms[j];
+        if ('scale' in t) {
+          code += indent+on+' = '+on+'.scale(['+t.scale[0]+','+t.scale[1]+']);\n';
+        }
+        if ('rotate' in t) {
+          code += indent+on+' = '+on+'.rotateZ('+t.rotate+');\n';
+        }
+        if ('translate' in t) {
+          code += indent+on+' = '+on+'.translate(['+t.translate[0]+','+t.translate[1]+']);\n';
+        }
+      }
+    }
+    if (i == 0) {
+      code += indent + ln +' = '+on+';\n';
+    } else {
+      code += indent + ln +' = '+ln+'.union('+on+');\n';
+    }
   }
 // post-code
   if (level == 0) {
@@ -663,10 +696,13 @@ CAG.codify = function(group,level) {
   return code;
 }
 
-CAG.parseSVG = function(src) {
+CAG.parseSVG = function(src, pxPmm) {
 
 // create a parser for the XML
   var parser = sax.parser(false, {trim: true, lowercase: false, position: true});
+  if (pxPmm !== undefined) {
+    if (pxPmm > parser.pxPmm) parser.pxPmm = pxPmm;
+  }
 // extend the parser with functions
   parser.onerror = function (e) {
     console.log('error: line '+e.line+', column '+e.column+', bad character ['+e.c+']');
@@ -738,6 +774,8 @@ CAG.parseSVG = function(src) {
       if (obj.type == 'svg') {
       // initial SVG (group)
         this.svgGroups.push(obj);
+        this.svgUnitsPmm = obj.unitsPmm;
+        this.svgUnitsPer = obj.unitsPer;
       } else {
       // add the object to the active group if necessary
         if (this.svgGroups.length > 0 && this.svgInDefs == false) {
