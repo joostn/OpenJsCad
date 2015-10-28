@@ -6,7 +6,7 @@ Copyright (c) 2015 Z3 Development https://github.com/z3dev
 All code released under MIT license
 
 Notes:
-1) All functions extend CAG object definitions in order to maintain the namespace.
+1) All functions extend SAX or CAG object definitions in order to maintain namespaces.
 */
 
 // import the required modules if necessary
@@ -30,7 +30,7 @@ if(typeof module !== 'undefined') {    // used via nodejs
 sax.SAXParser.prototype.cssPxUnit = 0.2822222;
 
 // units for converting CSS2 points/length, i.e. CSS2 value / pxPmm
-sax.SAXParser.prototype.pxPmm = 1 / 0.2822222;       // used for scaling SVG coordinates(PX) to CAG coordinates(MM)
+sax.SAXParser.prototype.pxPmm = 1 / 0.2822222;         // used for scaling SVG coordinates(PX) to CAG coordinates(MM)
 sax.SAXParser.prototype.inchMM = 1 / (1/0.039370);     // used for scaling SVG coordinates(IN) to CAG coordinates(MM)
 sax.SAXParser.prototype.ptMM = 1 / (1/0.039370/72);    // used for scaling SVG coordinates(IN) to CAG coordinates(MM)
 sax.SAXParser.prototype.pcMM = 1 / (1/0.039370/72*12); // used for scaling SVG coordinates(PC) to CAG coordinates(MM)
@@ -305,11 +305,11 @@ sax.SAXParser.prototype.svgPresentation = function(obj,element) {
   if ('FILL-OPACITY' in element) { obj.opacity = element.FILL-OPACITY; }
 // presentation attributes for lines
   if ('STROKE-WIDTH' in element) {
-    obj.strokeWidth = this.cagLengthX(element['STROKE-WIDTH']);
+    obj.strokeWidth = element['STROKE-WIDTH'];
   } else {
     var sw = this.cssStyle(element,'stroke-width');
     if (sw !== null) {
-      obj.strokeWidth = this.cagLengthX(sw);
+      obj.strokeWidth = sw;
     }
   }
   if ('STROKE' in element) {
@@ -347,7 +347,7 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
       if (a.indexOf(',') > 0) { a = a.split(','); } else { a = a.split(' '); }
       switch (n) {
         case 'translate':
-          var o = {translate: [this.cagLengthX(a[0]), -(this.cagLengthY(a[1]))]};
+          var o = {translate: [a[0], a[1]]};
           cag.transforms.push(o);
           break;
         case 'scale':
@@ -356,7 +356,7 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
           cag.transforms.push(o);
           break;
         case 'rotate':
-          var o = {rotate: -(a)};
+          var o = {rotate: a};
           cag.transforms.push(o);
           break;
         //case 'matrix':
@@ -389,13 +389,16 @@ sax.SAXParser.prototype.svgSvg = function(element) {
   if ('HEIGHT' in element) { obj.height = this.cagLength(element.HEIGHT,1.0); }
   if ('VIEWBOX' in element) {
     var list = element.VIEWBOX.trim();
-    var exp = new RegExp('(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)','i');
+    var exp = new RegExp('([\\d\\.\\-]+)[\\s,]+(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)','i');
     var v = exp.exec(list);
     if (v !== null) {
     // calculate units per mm of the view box
       var x = 1 / (obj.width  / parseFloat(v[3]));
       var y = 1 / (obj.height / parseFloat(v[4]));
       obj.unitsPmm = [x,y];
+    } else {
+    // default units per mm of the view box
+      obj.unitsPmm = [this.pxPmm,this.pxPmm];
     }
   } else {
   // default units per mm of the view box
@@ -413,13 +416,11 @@ sax.SAXParser.prototype.svgSvg = function(element) {
 }
 
 sax.SAXParser.prototype.svgEllipse = function(element) {
-  var obj = {type: 'ellipse'};
-  obj.cx = 0;
-  obj.cy = 0;
-  obj.rx = 0;
-  obj.ry = 0;
-  if ('RX' in element) { obj.rx = this.cagLengthX(element.RX); }
-  if ('RY' in element) { obj.ry = this.cagLengthY(element.RY); }
+  var obj = {type: 'ellipse', cx: '0', cy: '0', rx: '0', ry: '0'};
+  if ('CX' in element) { obj.cx = element.CX; }
+  if ('CY' in element) { obj.cy = element.CY; }
+  if ('RX' in element) { obj.rx = element.RX; }
+  if ('RY' in element) { obj.ry = element.RY; }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -430,16 +431,11 @@ sax.SAXParser.prototype.svgEllipse = function(element) {
 }
 
 sax.SAXParser.prototype.svgLine = function(element) {
-  var obj = {type: 'line'};
-  obj.x1 = 0;
-  obj.y1 = 0;
-  obj.x2 = 0;
-  obj.y2 = 0;
-  obj.strokeWidth  = 0; // width of line, from style: stroke-width
-  if ('X1' in element) { obj.x1 = this.cagLengthX(element.X1); }
-  if ('Y1' in element) { obj.y1 = -(this.cagLengthY(element.Y1)); }
-  if ('X2' in element) { obj.x2 = this.cagLengthX(element.X2); }
-  if ('Y2' in element) { obj.y2 = -(this.cagLengthY(element.Y2)); }
+  var obj = {type: 'line', x1: '0', y1: '0', x2: '0', y2: '0'};
+  if ('X1' in element) { obj.x1 = element.X1; }
+  if ('Y1' in element) { obj.y1 = element.Y1; }
+  if ('X2' in element) { obj.x2 = element.X2; }
+  if ('Y2' in element) { obj.y2 = element.Y2; }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -452,11 +448,12 @@ sax.SAXParser.prototype.svgLine = function(element) {
 sax.SAXParser.prototype.svgListOfPoints = function(list) {
   var points = [];
   var exp = new RegExp('([\\d\\-\\+\\.]+)[\\s,]+([\\d\\-\\+\\.]+)[\\s,]*','i');
+  list = list.trim();
   var v = exp.exec(list);
   while (v !== null) {
     var point = v[0];
     var next = exp.lastIndex+point.length;
-    point = {x: this.cagLengthX(v[1]), y: -(this.cagLengthY(v[2])) };
+    point = {x: v[1], y: v[2]};
     points.push(point);
     list = list.slice(next,list.length);
     v = exp.exec(list);
@@ -495,23 +492,23 @@ sax.SAXParser.prototype.svgPolygon = function(element) {
 }
 
 sax.SAXParser.prototype.svgRect = function(element) {
-  var obj = {type:'rect', x: 0, y: 0, rx: 0, ry: 0, width: 0, height: 0};
+  var obj = {type:'rect', x: '0', y: '0', rx: '0', ry: '0', width: '0', height: '0'};
 
-  if ('X' in element) { obj.x = this.cagLengthX(element.X); }
-  if ('Y' in element) { obj.y = -(this.cagLengthY(element.Y)); }
+  if ('X' in element) { obj.x = element.X; }
+  if ('Y' in element) { obj.y = element.Y; }
   if ('RX' in element) {
-    obj.rx = this.cagLengthX(element.RX);
+    obj.rx = element.RX;
     if (!('RY' in element)) { obj.ry = obj.rx } // by SVG specification
   }
   if ('RY' in element) {
-    obj.ry = this.cagLengthY(element.RY);
+    obj.ry = element.RY;
     if (!('RX' in element)) { obj.rx = obj.ry } // by SVG specification
   }
   if (obj.rx != obj.ry) {
     console.log('Warning: SVG element contains unsupported RX RY radius');
   }
-  if ('WIDTH' in element) { obj.width = this.cagLengthX(element.WIDTH); }
-  if ('HEIGHT' in element) { obj.height = this.cagLengthY(element.HEIGHT); }
+  if ('WIDTH' in element) { obj.width = element.WIDTH; }
+  if ('HEIGHT' in element) { obj.height = element.HEIGHT; }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -522,11 +519,11 @@ sax.SAXParser.prototype.svgRect = function(element) {
 }
 
 sax.SAXParser.prototype.svgCircle = function(element) {
-  var obj = {type: 'circle', x: 0, y: 0, radius: 0};
+  var obj = {type: 'circle', x: '0', y: '0', radius: '0'};
 
-  if ('CX' in element) { obj.x = this.cagLengthX(element.CX); }
-  if ('CY' in element) { obj.y = -(this.cagLengthY(element.CY)); }
-  if ('R' in element) { obj.radius = this.cagLengthX(element.R); }
+  if ('CX' in element) { obj.x = element.CX; }
+  if ('CY' in element) { obj.y = element.CY; }
+  if ('R'  in element) { obj.radius = element.R; }
 // transforms
   this.svgTransforms(obj,element);
 // core attributes
@@ -549,6 +546,116 @@ sax.SAXParser.prototype.svgGroup = function(element) {
   return obj;
 }
 
+//
+// Convert the PATH element into object representation
+//
+sax.SAXParser.prototype.svgPath = function(element) {
+console.log('svgPath()');
+  var obj = {type:'path'};
+// transforms
+  this.svgTransforms(obj,element);
+// core attributes
+  this.svgCore(obj,element);
+// presentation attributes
+  //this.svgPresentation(obj,element);
+
+  obj.commands = [];
+  if ('D' in element) {
+    var co = null; // current command
+    var bf = '';
+
+    var i = 0;
+    var l = element.D.length;
+console.log('D.length: '+l);
+    while (i < l) {
+      var c = element.D[i];
+      switch (c) {
+      // numbers
+      // FIXME support E notation numbers
+        case '-':
+          if (bf.length > 0) {
+            co.p.push(bf);
+            bf = '';
+          }
+          bf += c;
+          break;
+        case '.':
+          if (bf.length > 0) {
+            if (bf.indexOf('.') >= 0) {
+              co.p.push(bf);
+              bf = '';
+            }
+          }
+          bf += c;
+          break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          bf += c;
+          break;
+      // commands
+        case 'a':
+        case 'A':
+        case 'c':
+        case 'C':
+        case 'h':
+        case 'H':
+        case 'l':
+        case 'L':
+        case 'v':
+        case 'V':
+        case 'm':
+        case 'M':
+        case 'q':
+        case 'Q':
+        case 's':
+        case 'S':
+        case 't':
+        case 'T':
+        case 'z':
+        case 'Z':
+          if (co !== null) {
+            if (bf.length > 0) {
+              co.p.push(bf);
+              bf = '';
+            }
+            obj.commands.push(co);
+          }
+          co = {c: c,p: []};
+          break;
+      // white space
+        case ',':
+        case ' ':
+          if (co !== null) {
+            if (bf.length > 0) {
+              co.p.push(bf);
+              bf = '';
+            }
+          }
+          break;
+        default:
+          break;
+      }
+      i++;
+    }
+    if (i == l && co !== null) {
+      if (bf.length > 0) {
+        co.p.push(bf);
+      }
+      obj.commands.push(co);
+    }
+  }
+console.log('svgPath() done');
+  return obj;
+}
+
 // generate GROUP with attributes from USE element
 // - except X,Y,HEIGHT,WIDTH,XLINK:HREF
 // - append translate(x,y) if X,Y available
@@ -564,9 +671,9 @@ sax.SAXParser.prototype.svgUse = function(element) {
   this.svgPresentation(obj,element);
 
   if ('X' in element && 'Y' in element) {
-    var x = this.cagLengthX(element.X);
-    var y = this.cagLengthY(element.Y);
-    obj.translate = [this.cagLengthX(x),this.cagLengthY(y)];
+    if (!('transforms' in obj)) obj.transforms = [];
+    var o = {translate: [element.X, element.Y]};
+    obj.transforms.push(o);
   }
 
   obj.objects = [];
@@ -577,7 +684,6 @@ sax.SAXParser.prototype.svgUse = function(element) {
     if (this.svgObjects[ref] !== undefined) {
       ref = this.svgObjects[ref];
       ref = JSON.parse(JSON.stringify(ref));
-    // TBD apply presentation attributes from the group
       obj.objects.push(ref);
     }
   }
@@ -592,7 +698,16 @@ sax.SAXParser.prototype.svgObj      = null;  // svg in object form
 sax.SAXParser.prototype.svgUnitsPmm = [];
 sax.SAXParser.prototype.svgUnitsPer = 0;
 
-CAG.codify = function(group,level) {
+sax.SAXParser.prototype.reflect = function(x,y,px,py) {
+  var ox = x-px;
+  var oy = y-py;
+  if (x == px && y == px) return [x,y];
+  if (x == px) return [x,py+(-oy)];
+  if (y == py) return [px+(-ox),y];
+  return [px+(-ox),py+(-oy)];
+}
+
+sax.SAXParser.prototype.codify = function(group,level) {
   var indent = '  ';
   var i = level;
   while (i > 0) {
@@ -605,60 +720,286 @@ CAG.codify = function(group,level) {
     code += 'function main(p) {\n';
   }
   var ln = 'cag'+level;
-  //code += indent + 'var '+ln+' = CAG.rectangle({radius: [0.01,0.01]});\n';
-  code += indent + 'var '+ln+' = null;\n';
+  code += indent + 'var '+ln+' = new CAG();\n';
 // generate code for all objects
   for (i = 0; i < group.objects.length; i++) {
     var obj = group.objects[i];
     var on  = ln+i;
     switch (obj.type) {
       case 'group':
-        code += CAG.codify(obj,level+1);
+        code += this.codify(obj,level+1);
         code += indent+'var '+on+' = cag'+(level+1)+';\n';
         break;
       case 'rect':
-        var x = (obj.x+(obj.width/2)).toFixed(4);  // position the object via the center
-        var y = (obj.y-(obj.height/2)).toFixed(4); // position the object via the center
-        if (obj.rx == 0) {
-          code += indent+'var '+on+' = CAG.rectangle({center: ['+x+','+y+'], radius: ['+obj.width/2+','+obj.height/2+']});\n';
-        } else {
-          code += indent+'var '+on+' = CAG.roundedRectangle({center: ['+x+','+y+'], radius: ['+obj.width/2+','+obj.height/2+'], roundradius: '+obj.rx+'});\n';
+        var x  = this.cagLengthX(obj.x);
+        var y  = (0-this.cagLengthY(obj.y));
+        var w  = this.cagLengthX(obj.width);
+        var h  = this.cagLengthY(obj.height);
+        var rx = this.cagLengthX(obj.rx);
+        var ry = this.cagLengthY(obj.ry);
+        if (w > 0 && h > 0) {
+          x = (x+(w/2)).toFixed(4);  // position the object via the center
+          y = (y-(h/2)).toFixed(4);  // position the object via the center
+          if (rx == 0) {
+            code += indent+'var '+on+' = CAG.rectangle({center: ['+x+','+y+'], radius: ['+w/2+','+h/2+']});\n';
+          } else {
+            code += indent+'var '+on+' = CAG.roundedRectangle({center: ['+x+','+y+'], radius: ['+w/2+','+h/2+'], roundradius: '+rx+'});\n';
+          }
         }
         break;
       case 'circle':
-        code += indent+'var '+on+' = CAG.circle({center: ['+obj.x+','+obj.y+'], radius: '+obj.radius+'});\n';
+        var x = this.cagLengthX(obj.x);
+        var y = (0-this.cagLengthY(obj.y));
+        var r = this.cagLengthX(obj.radius);
+        if (r > 0) {
+          code += indent+'var '+on+' = CAG.circle({center: ['+x+','+y+'], radius: '+r+'});\n';
+        }
         break;
       case 'ellipse':
-        code += indent+'var '+on+' = CAG.circle({center: ['+obj.cx+','+obj.cy+'], radius: '+obj.rx+'}).scale([1,'+obj.ry/obj.rx+']);\n';
+        var rx = this.cagLengthX(obj.rx);
+        var ry = this.cagLengthY(obj.ry);
+        var cx = this.cagLengthX(obj.cx);
+        var cy = this.cagLengthY(obj.cy);
+        if (rx > 0 && ry > 0) {
+          code += indent+'var '+on+' = CAG.circle({center: ['+cx+','+cy+'], radius: '+rx+'}).scale([1,'+ry/rx+']);\n';
+        }
         break;
       case 'line':
-      // FIXME when CAG.line is available
-        code += indent+'var '+on+' = new CSG.Path2D([['+obj.x1+','+obj.y1+'],['+obj.x2+','+obj.y2+']],false);\n';
-        code += indent+on+' = '+on+'.expandToCAG('+obj.strokeWidth/2+',CSG.defaultResolution2D);\n';
+        var x1 = this.cagLengthX(obj.x1);
+        var y1 = (0-this.cagLengthY(obj.y1));
+        var x2 = this.cagLengthX(obj.x2);
+        var y2 = (0-this.cagLengthY(obj.y2));
+        var r = 0.05; // FIXME this should come from the group hiearchy
+        if ('strokeWidth' in obj) {
+          r  = this.cagLengthX(obj.strokeWidth)/2;
+        }
+        code += indent+'var '+on+' = new CSG.Path2D([['+x1+','+y1+'],['+x2+','+y2+']],false);\n';
+        code += indent+on+' = '+on+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
         break;
       case 'polygon':
-        code += indent+'var '+on+' = CAG.fromPoints([\n';
-        var j = 0;
-        for (j = 0; j < obj.points.length; j++) {
-          var p = obj.points[j];
-          if ('x' in p && 'y' in p) {
-            code += indent+'  ['+p.x+','+p.y+'],\n';
-          }
+        var r = 0.05; // FIXME this should come from the group hiearchy
+        if ('strokeWidth' in obj) {
+          r  = this.cagLengthX(obj.strokeWidth)/2;
         }
-        code += indent+']);\n';
-        break;
-      case 'polyline':
-      // FIXME when CAG.line is available
         code += indent+'var '+on+' = new CSG.Path2D([\n';
         var j = 0;
         for (j = 0; j < obj.points.length; j++) {
           var p = obj.points[j];
           if ('x' in p && 'y' in p) {
-            code += indent+'  ['+p.x+','+p.y+'],\n';
+            var x = this.cagLengthX(p.x);
+            var y = (0-this.cagLengthY(p.y));
+            code += indent+'  ['+x+','+y+'],\n';
+          }
+        }
+        code += indent+'],true);\n';
+        code += indent+on+' = '+on+'.innerToCAG();\n';
+        break;
+      case 'polyline':
+        var r = 0.05; // FIXME this should come from the group hiearchy
+        if ('strokeWidth' in obj) {
+          r  = this.cagLengthX(obj.strokeWidth)/2;
+        }
+        code += indent+'var '+on+' = new CSG.Path2D([\n';
+        var j = 0;
+        for (j = 0; j < obj.points.length; j++) {
+          var p = obj.points[j];
+          if ('x' in p && 'y' in p) {
+            var x = this.cagLengthX(p.x);
+            var y = (0-this.cagLengthY(p.y));
+            code += indent+'  ['+x+','+y+'],\n';
           }
         }
         code += indent+'],false);\n';
-        code += indent+on+' = '+on+'.expandToCAG('+obj.strokeWidth/2+',CSG.defaultResolution2D);\n';
+        code += indent+on+' = '+on+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
+        break;
+      case 'path':
+        code += indent+'var '+on+' = new CAG();\n';
+
+        var r = 0.05; // FIXME this should come from the group hiearchy
+        if ('strokeWidth' in obj) {
+          r  = this.cagLengthX(obj.strokeWidth)/2;
+        }
+        var cx = 0;     // current position
+        var cy = 0;
+        var cp = null;  // current path
+        var pi = 0;     // current path index
+        var pn = on+pi; // current path name
+        var pc = false; // current path closed
+        var bx = 0;     // 2nd control point from previous C command
+        var by = 0;     // 2nd control point from previous C command
+        var j = 0;
+        for (j = 0; j < obj.commands.length; j++) {
+          var co = obj.commands[j];
+          var pts = co.p;
+console.log('postion: ['+cx+','+cy+'] before '+co.c);
+          switch (co.c) {
+            case 'm': // relative move to X,Y
+            // close the previous path
+              if (pi > 0 && pc === false) {
+                code += indent+pn+' = '+pn+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
+              }
+            // open a new path
+              if (pts.length >= 2) {
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                pi++;
+                pn = on+pi;
+                pc = false;
+                code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+              }
+              break;
+              break;
+            case 'M': // absolute move to X,Y
+            // close the previous path
+              if (pi > 0 && pc === false) {
+                code += indent+pn+' = '+pn+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
+              }
+            // open a new path
+              if (pts.length >= 2) {
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                pi++;
+                pn = on+pi;
+                pc = false;
+                code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+              }
+              break;
+            case 'a': // relative elliptical arc
+              while (pts.length >= 7) {
+                var rx = this.cagLengthX(pts.shift());
+                var ry = this.cagLengthY(pts.shift());
+                var ro = 0-parseFloat(pts.shift());
+                var lf = (pts.shift() == '1');
+                var sf = (pts.shift() == '1');
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendArc(['+cx+','+cy+'],{xradius: '+rx+',yradius: '+ry+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
+              }
+              break;
+            case 'A': // absolute elliptical arc
+              while (pts.length >= 7) {
+                var rx = this.cagLengthX(pts.shift());
+                var ry = this.cagLengthY(pts.shift());
+                var ro = 0-parseFloat(pts.shift());
+                var lf = (pts.shift() == '1');
+                var sf = (pts.shift() == '1');
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendArc(['+cx+','+cy+'],{xradius: '+rx+',yradius: '+ry+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
+              }
+              break;
+            case 'c': // relative cubic Bézier
+              while (pts.length >= 6) {
+                var x1 = cx+this.cagLengthX(pts.shift());
+                var y1 = cy+(0-this.cagLengthY(pts.shift()));
+                bx = cx+this.cagLengthX(pts.shift());
+                by = cy+(0-this.cagLengthY(pts.shift()));
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(bx,by,cx,cy);
+                bx = rf[0];
+                by = rf[1];
+              }
+              break;
+            case 'C': // absolute cubic Bézier
+              while (pts.length >= 6) {
+                var x1 = this.cagLengthX(pts.shift());
+                var y1 = (0-this.cagLengthY(pts.shift()));
+                bx = this.cagLengthX(pts.shift());
+                by = (0-this.cagLengthY(pts.shift()));
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(bx,by,cx,cy);
+                bx = rf[0];
+                by = rf[1];
+              }
+              break;
+            case 's': // relative cubic Bézier shorthand
+              while (pts.length >= 4) {
+                var x1 = bx; // reflection of 2nd control point from previous C
+                var y1 = by; // reflection of 2nd control point from previous C
+                bx = cx+this.cagLengthX(pts.shift());
+                by = cy+(0-this.cagLengthY(pts.shift()));
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(bx,by,cx,cy);
+                bx = rf[0];
+                by = rf[1];
+              }
+              break;
+            case 'S': // absolute cubic Bézier shorthand
+              while (pts.length >= 4) {
+                var x1 = bx; // reflection of 2nd control point from previous C
+                var y1 = by; // reflection of 2nd control point from previous C
+                bx = this.cagLengthX(pts.shift());
+                by = (0-this.cagLengthY(pts.shift()));
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(bx,by,cx,cy);
+                bx = rf[0];
+                by = rf[1];
+              }
+              break;
+            case 'h': // relative Horzontal line to
+              while (pts.length >= 1) {
+                cx = cx+this.cagLengthX(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'H': // absolute Horzontal line to
+              while (pts.length >= 1) {
+                cx = this.cagLengthX(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'l': // relative line to
+              while (pts.length >= 2) {
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'L': // absolute line to
+              while (pts.length >= 2) {
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'v': // relative Vertical line to
+              while (pts.length >= 1) {
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'V': // absolute Vertical line to
+              while (pts.length >= 1) {
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+              }
+              break;
+            case 'z': // close current line
+            case 'Z':
+              code += indent+pn+' = '+pn+'.close();\n';
+              code += indent+pn+' = '+pn+'.innerToCAG();\n';
+              code += indent+on+' = '+on+'.union('+pn+');\n';
+              pc = true;
+              break;
+            default:
+              console.log('Warning: Unknow PATH command ['+co.c+']');
+              break;
+          }
+        }
+        if (pi > 0) {
+          if (pc === false) {
+            code += indent+pn+' = '+pn+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
+            code += indent+on+' = '+on+'.union('+pn+');\n';
+          }
+        }
         break;
       default:
         break;
@@ -672,21 +1013,26 @@ CAG.codify = function(group,level) {
       for (j = 0; j < obj.transforms.length; j++) {
         var t = obj.transforms[j];
         if ('scale' in t) {
-          code += indent+on+' = '+on+'.scale(['+t.scale[0]+','+t.scale[1]+']);\n';
+          var x = t.scale[0];
+          var y = t.scale[1];
+          code += indent+on+' = '+on+'.scale(['+x+','+y+']);\n';
         }
         if ('rotate' in t) {
-          code += indent+on+' = '+on+'.rotateZ('+t.rotate+');\n';
+          var z = 0-t.rotate;
+          code += indent+on+' = '+on+'.rotateZ('+z+');\n';
         }
         if ('translate' in t) {
-          code += indent+on+' = '+on+'.translate(['+t.translate[0]+','+t.translate[1]+']);\n';
+          var x = this.cagLengthX(t.translate[0]);
+          var y = (0-this.cagLengthY(t.translate[1]));
+          code += indent+on+' = '+on+'.translate(['+x+','+y+']);\n';
         }
       }
     }
-    if (i == 0) {
-      code += indent + ln +' = '+on+';\n';
-    } else {
+    //if (i == 0) {
+    //  code += indent + ln +' = '+on+';\n';
+    //} else {
       code += indent + ln +' = '+ln+'.union('+on+');\n';
-    }
+    //}
   }
 // post-code
   if (level == 0) {
@@ -744,16 +1090,17 @@ CAG.parseSVG = function(src, pxPmm) {
         break;
       //case 'SYMBOL':
       // this is just like an embedded SVG but does NOT render directly, only named
+      // this requires another set of control objects
       // only add to named objects for later USE
       //  break;
       case 'PATH':
+        obj = this.svgPath(node.attributes);
         break;
       case 'USE':
         obj = this.svgUse(node.attributes);
         break;
       case 'DEFS':
         this.svgInDefs = true;
-        console.log('DEFS start ['+this.svgInDefs+']');
         break;
       case 'DESC':
       case 'TITLE':
@@ -806,7 +1153,6 @@ CAG.parseSVG = function(src, pxPmm) {
         break;
       case 'DEFS':
         this.svgInDefs = false;
-        console.log('DEFS close ['+this.svgInDefs+']');
         break;
       case 'USE':
         obj = this.svgGroups.pop();
@@ -840,7 +1186,7 @@ CAG.parseSVG = function(src, pxPmm) {
   var code = '';
   if (parser.svgObj !== null) {
     console.log(JSON.stringify(parser.svgObj));
-    code = CAG.codify(parser.svgObj,0);
+    code = parser.codify(parser.svgObj,0);
   }
   return code;
 };
