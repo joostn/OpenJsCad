@@ -211,13 +211,13 @@ sax.SAXParser.prototype.cagLength = function(css,unit) {
     v =  (v * 10).toFixed(4); // absolute centimeters > millimeters
   } else
   if (css.search(/IN/i) > 0) {
-    v = (v / inchMM).toFixed(4); // absolute inches > millimeters
+    v = (v / this.inchMM).toFixed(4); // absolute inches > millimeters
   } else
   if (css.search(/PT/i) > 0) {
-    v = (v / ptMM).toFixed(4); // absolute points > millimeters
+    v = (v / this.ptMM).toFixed(4); // absolute points > millimeters
   } else
   if (css.search(/PC/i) > 0) {
-    v = (v / pcMM).toFixed(4); // absolute picas > millimeters
+    v = (v / this.pcMM).toFixed(4); // absolute picas > millimeters
   } else {
     v = (v / unit).toFixed(4); // absolute pixels(units) > millimeters
   }
@@ -292,7 +292,7 @@ sax.SAXParser.prototype.svgPresentation = function(obj,element) {
 // presentation attributes for all
   if ('DISPLAY' in element) { obj.visible = element.DISPLAY; }
 // presentation attributes for solids
-  if ('COLOR' in element) { obj.fill = cagColor(element.COLOR); }
+  if ('COLOR' in element) { obj.fill = this.cagColor(element.COLOR); }
   if ('OPACITY' in element) { obj.opacity = element.OPACITY; }
   if ('FILL' in element) {
     obj.fill = this.cagColor(element.FILL);
@@ -302,7 +302,7 @@ sax.SAXParser.prototype.svgPresentation = function(obj,element) {
       obj.fill = this.cagColor(s);
     }
   }
-  if ('FILL-OPACITY' in element) { obj.opacity = element.FILL-OPACITY; }
+  if ('FILL-OPACITY' in element) { obj.opacity = element['FILL-OPACITY']; }
 // presentation attributes for lines
   if ('STROKE-WIDTH' in element) {
     obj.strokeWidth = element['STROKE-WIDTH'];
@@ -505,7 +505,7 @@ sax.SAXParser.prototype.svgRect = function(element) {
     if (!('RX' in element)) { obj.rx = obj.ry } // by SVG specification
   }
   if (obj.rx != obj.ry) {
-    console.log('Warning: SVG element contains unsupported RX RY radius');
+    console.log('Warning: Unsupported RECT with RX and RY radius');
   }
   if ('WIDTH' in element) { obj.width = element.WIDTH; }
   if ('HEIGHT' in element) { obj.height = element.HEIGHT; }
@@ -550,7 +550,6 @@ sax.SAXParser.prototype.svgGroup = function(element) {
 // Convert the PATH element into object representation
 //
 sax.SAXParser.prototype.svgPath = function(element) {
-console.log('svgPath()');
   var obj = {type:'path'};
 // transforms
   this.svgTransforms(obj,element);
@@ -566,7 +565,6 @@ console.log('svgPath()');
 
     var i = 0;
     var l = element.D.length;
-console.log('D.length: '+l);
     while (i < l) {
       var c = element.D[i];
       switch (c) {
@@ -652,7 +650,6 @@ console.log('D.length: '+l);
       obj.commands.push(co);
     }
   }
-console.log('svgPath() done');
   return obj;
 }
 
@@ -756,10 +753,12 @@ sax.SAXParser.prototype.codify = function(group,level) {
         }
         break;
       case 'ellipse':
+      // FIXME this doesn't work as the scaling is not symetrical about the center
+      // use appendBezier()? appendArc()
         var rx = this.cagLengthX(obj.rx);
         var ry = this.cagLengthY(obj.ry);
         var cx = this.cagLengthX(obj.cx);
-        var cy = this.cagLengthY(obj.cy);
+        var cy = (0-this.cagLengthY(obj.cy));
         if (rx > 0 && ry > 0) {
           code += indent+'var '+on+' = CAG.circle({center: ['+cx+','+cy+'], radius: '+rx+'}).scale([1,'+ry/rx+']);\n';
         }
@@ -819,14 +818,17 @@ sax.SAXParser.prototype.codify = function(group,level) {
         if ('strokeWidth' in obj) {
           r  = this.cagLengthX(obj.strokeWidth)/2;
         }
+        var sx = 0;     // starting position
+        var sy = 0;
         var cx = 0;     // current position
         var cy = 0;
-        var cp = null;  // current path
         var pi = 0;     // current path index
         var pn = on+pi; // current path name
         var pc = false; // current path closed
         var bx = 0;     // 2nd control point from previous C command
         var by = 0;     // 2nd control point from previous C command
+        var qx = 0;     // 2nd control point from previous Q command
+        var qy = 0;     // 2nd control point from previous Q command
         var j = 0;
         for (j = 0; j < obj.commands.length; j++) {
           var co = obj.commands[j];
@@ -834,6 +836,10 @@ sax.SAXParser.prototype.codify = function(group,level) {
 console.log('postion: ['+cx+','+cy+'] before '+co.c);
           switch (co.c) {
             case 'm': // relative move to X,Y
+            // special case, if at beginning of path then treat like absolute M
+              if (j == 0) {
+                cx = 0; cy = 0;
+              }
             // close the previous path
               if (pi > 0 && pc === false) {
                 code += indent+pn+' = '+pn+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
@@ -846,6 +852,7 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
                 pn = on+pi;
                 pc = false;
                 code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+                sx = cx; sy = cy;
               }
               break;
               break;
@@ -862,6 +869,7 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
                 pn = on+pi;
                 pc = false;
                 code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+                sx = cx; sy = cy;
               }
               break;
             case 'a': // relative elliptical arc
@@ -914,6 +922,50 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
                 var rf = this.reflect(bx,by,cx,cy);
                 bx = rf[0];
                 by = rf[1];
+              }
+              break;
+            case 'q': // relative quadratic Bézier
+              while (pts.length >= 4) {
+                qx = cx+this.cagLengthX(pts.shift());
+                qy = cy+(0-this.cagLengthY(pts.shift()));
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(qx,qy,cx,cy);
+                qx = rf[0];
+                qy = rf[1];
+              }
+              break;
+            case 'Q': // absolute quadratic Bézier
+              while (pts.length >= 4) {
+                qx = this.cagLengthX(pts.shift());
+                qy = (0-this.cagLengthY(pts.shift()));
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(qx,qy,cx,cy);
+                qx = rf[0];
+                qy = rf[1];
+              }
+              break;
+            case 't': // relative quadratic Bézier shorthand
+              while (pts.length >= 2) {
+                cx = cx+this.cagLengthX(pts.shift());
+                cy = cy+(0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(qx,qy,cx,cy);
+                qx = rf[0];
+                qy = rf[1];
+              }
+              break;
+            case 'T': // absolute quadratic Bézier shorthand
+              while (pts.length >= 2) {
+                cx = this.cagLengthX(pts.shift());
+                cy = (0-this.cagLengthY(pts.shift()));
+                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                var rf = this.reflect(qx,qy,cx,cy);
+                qx = rf[0];
+                qy = rf[1];
               }
               break;
             case 's': // relative cubic Bézier shorthand
@@ -987,6 +1039,7 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               code += indent+pn+' = '+pn+'.close();\n';
               code += indent+pn+' = '+pn+'.innerToCAG();\n';
               code += indent+on+' = '+on+'.union('+pn+');\n';
+              cx =  sx; cy = sy; // return to the starting point
               pc = true;
               break;
             default:
