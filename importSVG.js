@@ -186,17 +186,63 @@ sax.SAXParser.prototype.svgColors = {
       'yellowgreen':          [154, 205,  50],
     };
 
-// Calculate the CAG length/size from the given CSS (SVG) value
-sax.SAXParser.prototype.cagLengthX = function(css) {
-  return this.cagLength(css,this.svgUnitsPmm[0]);
-}
-sax.SAXParser.prototype.cagLengthY = function(css) {
-  return this.cagLength(css,this.svgUnitsPmm[1]);
+
+// Calculate the CAG length/size from the given SVG value (float)
+sax.SAXParser.prototype.svg2cagX = function(v) {
+  return  (v / this.svgUnitsPmm[0]);
 }
 
-sax.SAXParser.prototype.cagLength = function(css,unit) {
+sax.SAXParser.prototype.svg2cagY = function(v) {
+  return  0-(v / this.svgUnitsPmm[1]);
+}
+
+// Calculate the CAG length/size from the given CSS value (string)
+sax.SAXParser.prototype.cagLengthX = function(css) {
+  if (css.indexOf('%') < 0) {
+    return this.css2cag(css,this.svgUnitsPmm[0]);
+  }
+// calculate the units as a percentage of the width
   var v = parseFloat(css); // number part
-  if (isNaN(v)) { v = 0; }
+  if (isNaN(v)) { return 0.0; }
+  if (v == 0) return v;
+  v = (v / 100) * this.svgUnitsX;
+// convert the units to mm
+  v = v / this.svgUnitsPmm[0];
+  return v;
+}
+
+sax.SAXParser.prototype.cagLengthY = function(css) {
+  if (css.indexOf('%') < 0) {
+    return this.css2cag(css,this.svgUnitsPmm[1]);
+  }
+// calculate the units as a percentage of the width
+  var v = parseFloat(css); // number part
+  if (isNaN(v)) { return 0.0; }
+  if (v == 0) return v;
+  v = (v / 100) * this.svgUnitsY;
+// convert the units to mm
+  v = v / this.svgUnitsPmm[1];
+  return v;
+}
+
+sax.SAXParser.prototype.cagLengthP = function(css) {
+  if (css.indexOf('%') < 0) {
+    return this.css2cag(css,this.svgUnitsPmm[1]);
+  }
+// calculate the units as a percentage of the viewport
+  var v = parseFloat(css); // number part
+  if (isNaN(v)) { return 0.0; }
+  if (v == 0) return v;
+  v = (v / 100) * this.svgUnitsV;
+// convert the units to mm
+  v = v / this.svgUnitsPmm[0]; // FIXME should this use X units?
+  return v;
+}
+
+sax.SAXParser.prototype.css2cag = function(css,unit) {
+//console.log('css2cag('+css+','+unit+')');
+  var v = parseFloat(css); // number part
+  if (isNaN(v)) { return 0.0; }
   if (v == 0) return v;
   if (css.search(/EM/i) > 0) {
     v = v; // font size
@@ -208,20 +254,21 @@ sax.SAXParser.prototype.cagLength = function(css,unit) {
     v = v; // absolute millimeters
   } else
   if (css.search(/CM/i) > 0) {
-    v =  (v * 10).toFixed(4); // absolute centimeters > millimeters
+    v =  (v * 10); // absolute centimeters > millimeters
   } else
   if (css.search(/IN/i) > 0) {
-    v = (v / this.inchMM).toFixed(4); // absolute inches > millimeters
+    v = (v / this.inchMM); // absolute inches > millimeters
   } else
   if (css.search(/PT/i) > 0) {
-    v = (v / this.ptMM).toFixed(4); // absolute points > millimeters
+    v = (v / this.ptMM);   // absolute points > millimeters
   } else
   if (css.search(/PC/i) > 0) {
-    v = (v / this.pcMM).toFixed(4); // absolute picas > millimeters
+    v = (v / this.pcMM);   // absolute picas > millimeters
   } else {
-    v = (v / unit).toFixed(4); // absolute pixels(units) > millimeters
+    v = (v / unit);        // absolute pixels(units) > millimeters
   }
-  return parseFloat(v);
+//console.log('v ('+v+')');
+  return v;
 }
 
 // convert the SVG color specification to CAG RGB
@@ -373,11 +420,15 @@ sax.SAXParser.prototype.svgTransforms = function(cag,element) {
 }
 
 sax.SAXParser.prototype.svgSvg = function(element) {
-// default viewport with CAG coordinates and units
-  var obj = {type: 'svg', width: 300, height: 300};
+// default SVG with no viewport
+  var obj = {type: 'svg', x: 0, y: 0, width: '100%', height: '100%', strokeWidth: '1'};
+
+// default units per mm
+  obj.unitsPmm = [this.pxPmm,this.pxPmm];
 
   if ('PXPMM' in element) {
   // WOW! a supplied value for pixel widths!!!
+    obj.pxPmm = element.PXPMM;
     //this.pxPmm = parseFloat(element.PXPMM);
     //if (isNaN(this.pxPmm)) { this.pxPmm = 1/this.cssPxUnit; } // use the default calculation
     //if (this.svgGroups.length == 0) {
@@ -385,26 +436,44 @@ sax.SAXParser.prototype.svgSvg = function(element) {
     //  console.log('*****PIXELS PER MM: '+this.pxPmm);
     //}
   }
-  if ('WIDTH' in element) { obj.width = this.cagLength(element.WIDTH,1.0); }
-  if ('HEIGHT' in element) { obj.height = this.cagLength(element.HEIGHT,1.0); }
+  if ('WIDTH' in element)  { obj.width  = element.WIDTH; }
+  if ('HEIGHT' in element) { obj.height = element.HEIGHT; }
   if ('VIEWBOX' in element) {
     var list = element.VIEWBOX.trim();
     var exp = new RegExp('([\\d\\.\\-]+)[\\s,]+(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)','i');
     var v = exp.exec(list);
     if (v !== null) {
+      obj.viewX = parseFloat(v[1]);
+      obj.viewY = parseFloat(v[2]);
+      obj.viewW = parseFloat(v[3]);
+      obj.viewH = parseFloat(v[4]);
+    }
+  // apply the viewbox
+    if (obj.width.indexOf('%') < 0) {
     // calculate units per mm of the view box
-      var x = 1 / (obj.width  / parseFloat(v[3]));
-      var y = 1 / (obj.height / parseFloat(v[4]));
-      obj.unitsPmm = [x,y];
+      var u = this.css2cag(obj.width,1.0);
+      obj.unitsPmm[0] = 1 / (u  / obj.viewW);
     } else {
-    // default units per mm of the view box
-      obj.unitsPmm = [this.pxPmm,this.pxPmm];
+    // scale the default units by the width (%)
+      var u = obj.unitsPmm[0] * (parseFloat(obj.width) / 100.0);
+      obj.unitsPmm[0] = u;
+    }
+    if (obj.height.indexOf('%') < 0) {
+    // calculate units per mm of the view box
+      var u = this.css2cag(obj.height,1.0);
+      obj.unitsPmm[1] = 1 / (u  / obj.viewH);
+    } else {
+    // scale the default units by the width (%)
+      var u = obj.unitsPmm[1] * (parseFloat(obj.height) / 100.0);
+      obj.unitsPmm[1] = u;
     }
   } else {
-  // default units per mm of the view box
-    obj.unitsPmm = [this.pxPmm,this.pxPmm];
+    obj.viewX = 0;
+    obj.viewY = 0;
+    obj.viewW = 1920 / obj.unitsPmm[0]; // average screen size / pixels per unit
+    obj.viewH = 1080 / obj.unitsPmm[1]; // average screen size / pixels per unit
   }
-  obj.unitsPer = Math.sqrt((obj.width*obj.width) + (obj.height*obj.height))/Math.SQRT2;
+  obj.viewP = Math.sqrt((obj.viewW*obj.viewW) + (obj.viewH*obj.viewH))/Math.SQRT2;
 
 // core attributes
   this.svgCore(obj,element);
@@ -704,7 +773,24 @@ sax.SAXParser.prototype.reflect = function(x,y,px,py) {
   return [px+(-ox),py+(-oy)];
 }
 
-sax.SAXParser.prototype.codify = function(group,level) {
+// Return the value for the given attribute from the group hiearchy
+sax.SAXParser.prototype.groupValue = function(name) {
+  var i = this.svgGroups.length;
+  while (i > 0) {
+    var g = this.svgGroups[i-1];
+    if (name in g) {
+      return g[name];
+    }
+    i--;
+  }
+  return null;
+}
+
+sax.SAXParser.prototype.codify = function(group) {
+  var level = this.svgGroups.length;
+// add this group to the heiarchy
+  this.svgGroups.push(group);
+// create an indent for the generated code
   var indent = '  ';
   var i = level;
   while (i > 0) {
@@ -714,7 +800,7 @@ sax.SAXParser.prototype.codify = function(group,level) {
 // pre-code
   var code = '';
   if (level == 0) {
-    code += 'function main(p) {\n';
+    code += 'function main(params) {\n';
   }
   var ln = 'cag'+level;
   code += indent + 'var '+ln+' = new CAG();\n';
@@ -724,7 +810,7 @@ sax.SAXParser.prototype.codify = function(group,level) {
     var on  = ln+i;
     switch (obj.type) {
       case 'group':
-        code += this.codify(obj,level+1);
+        code += this.codify(obj);
         code += indent+'var '+on+' = cag'+(level+1)+';\n';
         break;
       case 'rect':
@@ -747,7 +833,7 @@ sax.SAXParser.prototype.codify = function(group,level) {
       case 'circle':
         var x = this.cagLengthX(obj.x);
         var y = (0-this.cagLengthY(obj.y));
-        var r = this.cagLengthX(obj.radius);
+        var r = this.cagLengthP(obj.radius);
         if (r > 0) {
           code += indent+'var '+on+' = CAG.circle({center: ['+x+','+y+'], radius: '+r+'});\n';
         }
@@ -768,18 +854,19 @@ sax.SAXParser.prototype.codify = function(group,level) {
         var y1 = (0-this.cagLengthY(obj.y1));
         var x2 = this.cagLengthX(obj.x2);
         var y2 = (0-this.cagLengthY(obj.y2));
-        var r = 0.05; // FIXME this should come from the group hiearchy
+        var r = this.cssPxUnit; // default
         if ('strokeWidth' in obj) {
-          r  = this.cagLengthX(obj.strokeWidth)/2;
+          r  = this.cagLengthP(obj.strokeWidth)/2;
+        } else {
+          var v = this.groupValue('strokeWidth');
+          if (v !== null) {
+            r  = this.cagLengthP(v)/2;
+          }
         }
         code += indent+'var '+on+' = new CSG.Path2D([['+x1+','+y1+'],['+x2+','+y2+']],false);\n';
         code += indent+on+' = '+on+'.expandToCAG('+r+',CSG.defaultResolution2D);\n';
         break;
       case 'polygon':
-        var r = 0.05; // FIXME this should come from the group hiearchy
-        if ('strokeWidth' in obj) {
-          r  = this.cagLengthX(obj.strokeWidth)/2;
-        }
         code += indent+'var '+on+' = new CSG.Path2D([\n';
         var j = 0;
         for (j = 0; j < obj.points.length; j++) {
@@ -794,9 +881,14 @@ sax.SAXParser.prototype.codify = function(group,level) {
         code += indent+on+' = '+on+'.innerToCAG();\n';
         break;
       case 'polyline':
-        var r = 0.05; // FIXME this should come from the group hiearchy
+        var r = this.cssPxUnit; // default
         if ('strokeWidth' in obj) {
-          r  = this.cagLengthX(obj.strokeWidth)/2;
+          r  = this.cagLengthP(obj.strokeWidth)/2;
+        } else {
+          var v = this.groupValue('strokeWidth');
+          if (v !== null) {
+            r  = this.cagLengthP(v)/2;
+          }
         }
         code += indent+'var '+on+' = new CSG.Path2D([\n';
         var j = 0;
@@ -814,10 +906,16 @@ sax.SAXParser.prototype.codify = function(group,level) {
       case 'path':
         code += indent+'var '+on+' = new CAG();\n';
 
-        var r = 0.05; // FIXME this should come from the group hiearchy
+        var r = this.cssPxUnit; // default
         if ('strokeWidth' in obj) {
-          r  = this.cagLengthX(obj.strokeWidth)/2;
+          r  = this.cagLengthP(obj.strokeWidth)/2;
+        } else {
+          var v = this.groupValue('strokeWidth');
+          if (v !== null) {
+            r  = this.cagLengthP(v)/2;
+          }
         }
+      // Note: All values are SVG values
         var sx = 0;     // starting position
         var sy = 0;
         var cx = 0;     // current position
@@ -846,12 +944,12 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               }
             // open a new path
               if (pts.length >= 2) {
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
                 pi++;
                 pn = on+pi;
                 pc = false;
-                code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+                code += indent+'var '+pn+' = new CSG.Path2D([['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']],false);\n';
                 sx = cx; sy = cy;
               }
               break;
@@ -863,48 +961,48 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               }
             // open a new path
               if (pts.length >= 2) {
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
                 pi++;
                 pn = on+pi;
                 pc = false;
-                code += indent+'var '+pn+' = new CSG.Path2D([['+cx+','+cy+']],false);\n';
+                code += indent+'var '+pn+' = new CSG.Path2D([['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']],false);\n';
                 sx = cx; sy = cy;
               }
               break;
             case 'a': // relative elliptical arc
               while (pts.length >= 7) {
-                var rx = this.cagLengthX(pts.shift());
-                var ry = this.cagLengthY(pts.shift());
+                var rx = parseFloat(pts.shift());
+                var ry = parseFloat(pts.shift());
                 var ro = 0-parseFloat(pts.shift());
                 var lf = (pts.shift() == '1');
                 var sf = (pts.shift() == '1');
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendArc(['+cx+','+cy+'],{xradius: '+rx+',yradius: '+ry+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendArc(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+'],{xradius: '+this.svg2cagX(rx)+',yradius: '+this.svg2cagY(ry)+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
               }
               break;
             case 'A': // absolute elliptical arc
               while (pts.length >= 7) {
-                var rx = this.cagLengthX(pts.shift());
-                var ry = this.cagLengthY(pts.shift());
+                var rx = parseFloat(pts.shift());
+                var ry = parseFloat(pts.shift());
                 var ro = 0-parseFloat(pts.shift());
                 var lf = (pts.shift() == '1');
                 var sf = (pts.shift() == '1');
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendArc(['+cx+','+cy+'],{xradius: '+rx+',yradius: '+ry+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendArc(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+'],{xradius: '+this.svg2cagX(rx)+',yradius: '+this.svg2cagY(ry)+',xaxisrotation: '+ro+',clockwise: '+sf+',large: '+lf+'});\n';
               }
               break;
             case 'c': // relative cubic Bézier
               while (pts.length >= 6) {
-                var x1 = cx+this.cagLengthX(pts.shift());
-                var y1 = cy+(0-this.cagLengthY(pts.shift()));
-                bx = cx+this.cagLengthX(pts.shift());
-                by = cy+(0-this.cagLengthY(pts.shift()));
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var x1 = cx+parseFloat(pts.shift());
+                var y1 = cy+parseFloat(pts.shift());
+                bx = cx+parseFloat(pts.shift());
+                by = cy+parseFloat(pts.shift());
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(x1)+','+this.svg2cagY(y1)+'],['+this.svg2cagX(bx)+','+this.svg2cagY(by)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(bx,by,cx,cy);
                 bx = rf[0];
                 by = rf[1];
@@ -912,13 +1010,13 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 'C': // absolute cubic Bézier
               while (pts.length >= 6) {
-                var x1 = this.cagLengthX(pts.shift());
-                var y1 = (0-this.cagLengthY(pts.shift()));
-                bx = this.cagLengthX(pts.shift());
-                by = (0-this.cagLengthY(pts.shift()));
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                var x1 = parseFloat(pts.shift());
+                var y1 = parseFloat(pts.shift());
+                bx = parseFloat(pts.shift());
+                by = parseFloat(pts.shift());
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(x1)+','+this.svg2cagY(y1)+'],['+this.svg2cagX(bx)+','+this.svg2cagY(by)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(bx,by,cx,cy);
                 bx = rf[0];
                 by = rf[1];
@@ -926,11 +1024,11 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 'q': // relative quadratic Bézier
               while (pts.length >= 4) {
-                qx = cx+this.cagLengthX(pts.shift());
-                qy = cy+(0-this.cagLengthY(pts.shift()));
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                qx = cx+parseFloat(pts.shift());
+                qy = cy+parseFloat(pts.shift());
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(qx,qy,cx,cy);
                 qx = rf[0];
                 qy = rf[1];
@@ -938,11 +1036,11 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 'Q': // absolute quadratic Bézier
               while (pts.length >= 4) {
-                qx = this.cagLengthX(pts.shift());
-                qy = (0-this.cagLengthY(pts.shift()));
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                qx = parseFloat(pts.shift());
+                qy = parseFloat(pts.shift());
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(qx,qy,cx,cy);
                 qx = rf[0];
                 qy = rf[1];
@@ -950,9 +1048,9 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 't': // relative quadratic Bézier shorthand
               while (pts.length >= 2) {
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+cx+','+cy+']]);\n';
                 var rf = this.reflect(qx,qy,cx,cy);
                 qx = rf[0];
                 qy = rf[1];
@@ -960,9 +1058,9 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 'T': // absolute quadratic Bézier shorthand
               while (pts.length >= 2) {
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+qx+','+qy+'],['+qx+','+qy+'],['+cx+','+cy+']]);\n';
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(qx)+','+this.svg2cagY(qy)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(qx,qy,cx,cy);
                 qx = rf[0];
                 qy = rf[1];
@@ -972,11 +1070,11 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               while (pts.length >= 4) {
                 var x1 = bx; // reflection of 2nd control point from previous C
                 var y1 = by; // reflection of 2nd control point from previous C
-                bx = cx+this.cagLengthX(pts.shift());
-                by = cy+(0-this.cagLengthY(pts.shift()));
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                bx = cx+parseFloat(pts.shift());
+                by = cy+parseFloat(pts.shift());
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(x1)+','+this.svg2cagY(y1)+'],['+this.svg2cagX(bx)+','+this.svg2cagY(by)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(bx,by,cx,cy);
                 bx = rf[0];
                 by = rf[1];
@@ -986,11 +1084,11 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               while (pts.length >= 4) {
                 var x1 = bx; // reflection of 2nd control point from previous C
                 var y1 = by; // reflection of 2nd control point from previous C
-                bx = this.cagLengthX(pts.shift());
-                by = (0-this.cagLengthY(pts.shift()));
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendBezier([['+x1+','+y1+'],['+bx+','+by+'],['+cx+','+cy+']]);\n';
+                bx = parseFloat(pts.shift());
+                by = parseFloat(pts.shift());
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendBezier([['+this.svg2cagX(x1)+','+this.svg2cagY(y1)+'],['+this.svg2cagX(bx)+','+this.svg2cagY(by)+'],['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']]);\n';
                 var rf = this.reflect(bx,by,cx,cy);
                 bx = rf[0];
                 by = rf[1];
@@ -998,40 +1096,40 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               break;
             case 'h': // relative Horzontal line to
               while (pts.length >= 1) {
-                cx = cx+this.cagLengthX(pts.shift());
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cx = cx+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'H': // absolute Horzontal line to
               while (pts.length >= 1) {
-                cx = this.cagLengthX(pts.shift());
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cx = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'l': // relative line to
               while (pts.length >= 2) {
-                cx = cx+this.cagLengthX(pts.shift());
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cx = cx+parseFloat(pts.shift());
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'L': // absolute line to
               while (pts.length >= 2) {
-                cx = this.cagLengthX(pts.shift());
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cx = parseFloat(pts.shift());
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'v': // relative Vertical line to
               while (pts.length >= 1) {
-                cy = cy+(0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cy = cy+parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'V': // absolute Vertical line to
               while (pts.length >= 1) {
-                cy = (0-this.cagLengthY(pts.shift()));
-                code += indent+pn+' = '+pn+'.appendPoint(['+cx+','+cy+']);\n';
+                cy = parseFloat(pts.shift());
+                code += indent+pn+' = '+pn+'.appendPoint(['+this.svg2cagX(cx)+','+this.svg2cagY(cy)+']);\n';
               }
               break;
             case 'z': // close current line
@@ -1046,6 +1144,7 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
               console.log('Warning: Unknow PATH command ['+co.c+']');
               break;
           }
+console.log('postion: ['+cx+','+cy+'] after '+co.c);
         }
         if (pi > 0) {
           if (pc === false) {
@@ -1062,36 +1161,44 @@ console.log('postion: ['+cx+','+cy+'] before '+co.c);
     //  code += indent+on+' = '+on+'.setColor(['+obj.fill[0]+','+obj.fill[1]+','+obj.fill[2]+']);\n';
     }
     if ('transforms' in obj) {
+    // NOTE: SVG specifications require that transforms are applied in the order given.
+    //       But these are applied in the order as required by CSG/CAG
+      var tr = null;
+      var ts = null;
+      var tt = null;
+
       var j = 0;
       for (j = 0; j < obj.transforms.length; j++) {
         var t = obj.transforms[j];
-        if ('scale' in t) {
-          var x = t.scale[0];
-          var y = t.scale[1];
-          code += indent+on+' = '+on+'.scale(['+x+','+y+']);\n';
-        }
-        if ('rotate' in t) {
-          var z = 0-t.rotate;
-          code += indent+on+' = '+on+'.rotateZ('+z+');\n';
-        }
-        if ('translate' in t) {
-          var x = this.cagLengthX(t.translate[0]);
-          var y = (0-this.cagLengthY(t.translate[1]));
-          code += indent+on+' = '+on+'.translate(['+x+','+y+']);\n';
-        }
+        if ('rotate' in t)    { tr = t; }
+        if ('scale' in t)     { ts = t; }
+        if ('translate' in t) { tt = t; }
+      }
+      if (ts !== null) {
+        var x = ts.scale[0];
+        var y = ts.scale[1];
+        code += indent+on+' = '+on+'.scale(['+x+','+y+']);\n';
+      }
+      if (tr !== null) {
+        var z = 0-tr.rotate;
+        code += indent+on+' = '+on+'.rotateZ('+z+');\n';
+      }
+      if (tt !== null) {
+        var x = this.cagLengthX(tt.translate[0]);
+        var y = (0-this.cagLengthY(tt.translate[1]));
+        code += indent+on+' = '+on+'.translate(['+x+','+y+']);\n';
       }
     }
-    //if (i == 0) {
-    //  code += indent + ln +' = '+on+';\n';
-    //} else {
-      code += indent + ln +' = '+ln+'.union('+on+');\n';
-    //}
+    code += indent + ln +' = '+ln+'.union('+on+');\n';
   }
 // post-code
   if (level == 0) {
     code += indent+'return '+ln+';\n';
     code += '}\n';
   }
+// remove this group from the hiearchy
+  this.svgGroups.pop();
+
   return code;
 }
 
@@ -1175,7 +1282,9 @@ CAG.parseSVG = function(src, pxPmm) {
       // initial SVG (group)
         this.svgGroups.push(obj);
         this.svgUnitsPmm = obj.unitsPmm;
-        this.svgUnitsPer = obj.unitsPer;
+        this.svgUnitsX = obj.viewW;
+        this.svgUnitsY = obj.viewH;
+        this.svgUnitsV = obj.viewP;
       } else {
       // add the object to the active group if necessary
         if (this.svgGroups.length > 0 && this.svgInDefs == false) {
@@ -1239,7 +1348,9 @@ CAG.parseSVG = function(src, pxPmm) {
   var code = '';
   if (parser.svgObj !== null) {
     console.log(JSON.stringify(parser.svgObj));
-    code = parser.codify(parser.svgObj,0);
+    code = parser.codify(parser.svgObj);
+  } else {
+    console.log('Warning: SVG parsing failed');
   }
   return code;
 };
