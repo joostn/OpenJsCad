@@ -445,7 +445,7 @@ OpenJsCad.Processor.prototype = {
   // pass "faces" or "lines"
   toggleDrawOption: function(str) {
     if (str == 'faces' || str == 'lines') {
-      var newState = !this.viewer.drawOptions[str];
+      var newState = !this.viewer.options.solid[str];
       this.setDrawOption(str, newState);
       return newState;
     }
@@ -453,7 +453,7 @@ OpenJsCad.Processor.prototype = {
   // e.g. setDrawOption('lines', false);
   setDrawOption: function(str, bool) {
     if (str == 'faces' || str == 'lines') {
-      this.viewer.drawOptions[str] = !!bool;      
+      this.viewer.options.solid[str] = !!bool;
     }
     this.viewer.applyDrawOptions();
   },
