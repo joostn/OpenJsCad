@@ -85,6 +85,7 @@ OpenJsCad.Viewer.prototype = {
       // controls.autoRotate = true;
       controls.autoRotateSpeed = 1;
       controls.addEventListener( 'change', this.render.bind(this));
+      controls.addEventListener( 'change', this.cameraChanged.bind(this));
     },
     webGLAvailable: function() {
         try {
@@ -129,6 +130,9 @@ OpenJsCad.Viewer.prototype = {
         this_.createRenderer(true);
         this_.animate();
         }, false);
+    },
+    cameraChanged: function(ev) {
+        localStorage.camera = JSON.stringify(ev.position.toArray());
     },
     render: function() {
       if (!this.pauseRender_) {
@@ -228,6 +232,10 @@ OpenJsCad.Viewer.prototype = {
         var d = r / Math.tan(this.perspective * Math.PI / 180);
         // play here for different start zoom
         this.camera_.position.set(d*2, d*2, d);
+        if (localStorage.camera) {
+            var a = JSON.parse(localStorage.camera);
+            this.camera_.position.fromArray(a);
+        }
         this.camera_.zoom = 1;
         this.camera_.lookAt(this.scene_.position);
         this.camera_.updateProjectionMatrix();
