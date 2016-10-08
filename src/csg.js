@@ -824,6 +824,9 @@ for solid CAD anyway.
         },
 
         setColor: function(args) {
+            // Remember the color that has been set so that it can be made
+            // translucent / brighter polymorphically
+            this.properties.color = arguments;
             var newshared = CSG.Polygon.Shared.fromColor.apply(this, arguments);
             return this.setShared(newshared);
         },
