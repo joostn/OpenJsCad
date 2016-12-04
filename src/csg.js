@@ -139,7 +139,8 @@ for solid CAD anyway.
             return CSG.Polygon.fromObject(p);
         });
         var csg = CSG.fromPolygons(polygons);
-        csg = csg.canonicalized();
+        csg.isCanonicalized = obj.isCanonicalized;
+        csg.isRetesselated  = obj.isRetesselated;
         return csg;
     };
 
@@ -957,7 +958,8 @@ for solid CAD anyway.
         // So that it is in an orientation suitable for CNC milling
         getTransformationAndInverseTransformationToFlatLying: function() {
             if (this.polygons.length === 0) {
-                return new CSG.Matrix4x4(); // unity
+                var m = new CSG.Matrix4x4(); // unity
+                return [m,m];
             } else {
                 // get a list of unique planes in the CSG:
                 var csg = this.canonicalized();
@@ -5329,8 +5331,8 @@ for solid CAD anyway.
                 var y = Math.round((-sinphi * minushalfdistance.x + cosphi * minushalfdistance.y)*decimals)/decimals;
                 var start_translated = new CSG.Vector2D(x,y);
                 // F.6.6.2:
-                var biglambda = start_translated.x * start_translated.x / (xradius * xradius) + start_translated.y * start_translated.y / (yradius * yradius);
-                if (biglambda > 1) {
+                var biglambda = (start_translated.x * start_translated.x) / (xradius * xradius) + (start_translated.y * start_translated.y) / (yradius * yradius);
+                if (biglambda > 1.0) {
                     // F.6.6.3:
                     var sqrtbiglambda = Math.sqrt(biglambda);
                     xradius *= sqrtbiglambda;
@@ -5457,6 +5459,17 @@ for solid CAD anyway.
     // Each side is a line between 2 points
     var CAG = function() {
         this.sides = [];
+        this.isCanonicalized = false;
+    };
+
+    // create from an untyped object with identical property names.
+    CAG.fromObject = function(obj) {
+        var sides = obj.sides.map(function(s) {
+            return CAG.Side.fromObject(s);
+        });
+        var cag = CAG.fromSides(sides);
+        cag.isCanonicalized = obj.isCanonicalized;
+        return cag;
     };
 
     // Construct a CAG from a list of `CAG.Side` instances.
@@ -6354,6 +6367,10 @@ for solid CAD anyway.
         this.pos = pos;
     };
 
+    CAG.Vertex.fromObject = function(obj) {
+        return new CAG.Vertex(new CSG.Vector2D(obj.pos._x,obj.pos._y));
+    };
+
     CAG.Vertex.prototype = {
         toString: function() {
             return "(" + this.pos.x.toFixed(2) + "," + this.pos.y.toFixed(2) + ")";
@@ -6373,6 +6390,12 @@ for solid CAD anyway.
         if (!(vertex1 instanceof CAG.Vertex)) throw new Error("Assertion failed");
         this.vertex0 = vertex0;
         this.vertex1 = vertex1;
+    };
+
+    CAG.Side.fromObject = function(obj) {
+        var vertex0 = CAG.Vertex.fromObject(obj.vertex0);
+        var vertex1 = CAG.Vertex.fromObject(obj.vertex1);
+        return new CAG.Side(vertex0,vertex1);
     };
 
     CAG.Side._fromFakePolygon = function(polygon) {
