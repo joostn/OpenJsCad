@@ -10,7 +10,7 @@
 */
 THREE.CSG = {
     // convert CSG object to three.js mesh.
-    fromCSG: function(csg, defaultColor) {
+    fromCSG: function(csg, defaultColor, overlay) {
 
         var i, j, vertices, face,
             three_geometry = new THREE.Geometry(),
@@ -80,7 +80,8 @@ THREE.CSG = {
                 opacity: opa || 1,
                 wireframe: asWireframe,
                 transparent: opa != 1 && opa != 0,
-                vertexColors: THREE.FaceColors
+                vertexColors: THREE.FaceColors,
+                polygonOffset: overlay ? true : false,
             });
             // (force black wireframe)
             // if (asWireframe) {
@@ -103,7 +104,8 @@ THREE.CSG = {
         var phongWireframeMaterial = new THREE.MeshPhongMaterial({
             wireframe: true,
             transparent: false,
-            color:'black'
+            color:'black',
+            depthTest: overlay ? false : true,
         });
         var wireframe = new THREE.Mesh(three_geometry, phongWireframeMaterial);
 
