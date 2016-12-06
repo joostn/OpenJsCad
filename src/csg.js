@@ -1552,6 +1552,10 @@ for solid CAD anyway.
         var center = CSG.parseOptionAs3DVector(options, "center", [0, 0, 0]);
         var radius = CSG.parseOptionAsFloat(options, "radius", 1);
         var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution3D);
+        if (CSG.featureSize) {
+            resolution = Math.ceil((2 * Math.PI) / (CSG.featureSize / radius));
+            if (resolution < 3) resolution = 3;
+        }
         var xvector, yvector, zvector;
         if ('axes' in options) {
             xvector = options.axes[0].unit().times(radius);
@@ -1641,7 +1645,19 @@ for solid CAD anyway.
             throw new Error("Either radiusStart or radiusEnd should be positive");
         }
 
+        // If a feature size is specified then set the resolution in terms of that
         var slices = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution2D);
+        if (CSG.featureSize) {
+            var  rAvg = (rStart + rEnd) / 2;
+            // The distance around the circumference subtended by an angle, a, in
+            // radians is a*r.  Choose slices such that distance = featureSize
+            // featureSize = a * r;  a = 2.PI / slices
+            //  = (2.PI / slices) * r
+            // featureSize / r = 2.PI / slices
+            //  slices = 2.PI / (featureSize / r)
+            slices = Math.ceil((2 * Math.PI) / (CSG.featureSize / rAvg));
+            if (slices < 3) slices = 3;
+        }
         var ray = e.minus(s);
         var axisZ = ray.unit(); //, isY = (Math.abs(axisZ.y) > 0.5);
         var axisX = axisZ.randomNonParallelVector().unit();
@@ -6090,6 +6106,11 @@ for solid CAD anyway.
         rotateExtrude: function(options) {
             var alpha = CSG.parseOptionAsFloat(options, "angle", 360);
             var resolution = CSG.parseOptionAsInt(options, "resolution", CSG.defaultResolution3D);
+            if (CSG.featureSize) {
+                var max_radius = this.getBounds()[1]._x;
+                resolution = Math.ceil((2 * Math.PI) / (CSG.featureSize / max_radius));
+                if (resolution < 3) resolution = 3;
+            }
 
             var EPS = 1e-5;
 
