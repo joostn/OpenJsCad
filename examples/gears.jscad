@@ -67,7 +67,7 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
   for(var i = 0; i <= resolution; i++)
   {
     // first side of the tooth:
-    var angle = maxangle * i / resolution;
+    var angle = maxangle * Math.pow(i/resolution, 2/3);
     var tanlength = angle * baseRadius;
     var radvector = CSG.Vector2D.fromAngle(angle);    
     var tanvector = radvector.normal();
